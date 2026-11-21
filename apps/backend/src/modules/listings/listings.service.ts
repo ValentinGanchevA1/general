@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, type QueryRunner } from 'typeorm';
 
 import {
   computeH3Cells,
@@ -32,6 +32,13 @@ import { S3Service } from '../../common/s3.service';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const OFFER_PREVIEW = 50;
+const LISTING_VIEWER_ACCESS_PREDICATE = `
+  AND (l.visibility = 'public' OR l.seller_id = $1)
+  AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+         WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+            OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+      )`;
 
 interface ListingRow {
   id: string;
@@ -50,6 +57,17 @@ interface ListingRow {
   expires_at: Date | null;
   bumped_at: Date | null;
   favorited_by_me: boolean;
+}
+
+
+interface LockedOfferRow {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  status: OfferStatus;
+  last_actor: 'buyer' | 'seller' | null;
+  seller_id: string;
+  listing_status: ListingStatus;
 }
 
 interface OfferRow {
@@ -72,6 +90,70 @@ export class ListingsService {
     private readonly notifications: NotificationsService,
     private readonly s3: S3Service,
   ) {}
+
+  private async withMarketplaceTransaction<T>(
+    operation: (queryRunner: QueryRunner) => Promise<T>,
+  ): Promise<T> {
+    const queryRunner = this.db.createQueryRunner();
+    let connected = false;
+    let transactionStarted = false;
+    try {
+      await queryRunner.connect();
+      connected = true;
+      await queryRunner.startTransaction();
+      transactionStarted = true;
+      const result = await operation(queryRunner);
+      await queryRunner.commitTransaction();
+      transactionStarted = false;
+      return result;
+    } catch (error: unknown) {
+      if (transactionStarted) await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      if (connected) await queryRunner.release();
+    }
+  }
+
+  private async lockOfferForUpdate(
+    queryRunner: QueryRunner,
+    offerId: string,
+  ): Promise<LockedOfferRow> {
+    const [offerRef] = (await queryRunner.query(
+      `SELECT listing_id FROM trade_offers WHERE id = $1`,
+      [offerId],
+    )) as Array<{ listing_id: string }>;
+    if (!offerRef) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+
+    const [listing] = (await queryRunner.query(
+      `SELECT id FROM listings WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      [offerRef.listing_id],
+    )) as Array<{ id: string }>;
+    if (!listing) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+
+    const [offer] = (await queryRunner.query(
+      `SELECT o.id, o.listing_id, o.buyer_id, o.status, o.last_actor,
+              l.seller_id, l.status AS listing_status
+         FROM trade_offers o
+         JOIN listings l ON l.id = o.listing_id
+        WHERE o.id = $1
+          AND l.deleted_at IS NULL
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
+                    OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
+              )
+        FOR UPDATE OF o`,
+      [offerId],
+    )) as Array<LockedOfferRow>;
+    if (!offer) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+    return offer;
+  }
 
   async uploadImage(
     userId: string,
@@ -144,12 +226,7 @@ export class ListingsService {
         WHERE l.deleted_at IS NULL
           AND l.status = 'active'
           AND (l.expires_at IS NULL OR l.expires_at > NOW())
-          AND (l.visibility = 'public' OR l.seller_id = $1)
-          AND NOT EXISTS (
-                SELECT 1 FROM user_blocks ub
-                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
-                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
-              )
+          ${LISTING_VIEWER_ACCESS_PREDICATE}
           AND ($5::text IS NULL OR l.category = $5)
           AND ($7::text IS NULL OR l.mode = $7)
           AND ST_DWithin(
@@ -238,54 +315,105 @@ export class ListingsService {
   }
 
   async updateStatus(userId: string, listingId: string, status: ListingStatus): Promise<ListingDetail> {
-    await this.assertSeller(userId, listingId);
-    await this.db.query(
-      `UPDATE listings SET status = $2, updated_at = NOW() WHERE id = $1`,
-      [listingId, status],
-    );
+    await this.withMarketplaceTransaction(async (qr) => {
+      // Serialize all listing/offer lifecycle mutations on the listing row first.
+      const [listing] = (await qr.query(
+        `SELECT id, seller_id, status FROM listings
+          WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+        [listingId],
+      )) as Array<{ id: string; seller_id: string; status: ListingStatus }>;
+      if (!listing) {
+        throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
+      }
+      if (listing.seller_id !== userId) {
+        throw new ForbiddenException({
+          code: 'listing.not_seller', message: 'Only the seller can update this listing.',
+        });
+      }
+
+      if (listing.status !== status) {
+        // Manual sold is supported, but terminal listings cannot be reopened.
+        if (listing.status !== 'active' || status === 'active') {
+          throw new ConflictException({
+            code: 'listing.invalid_status_transition',
+            message: 'This listing cannot change to the requested status.',
+          });
+        }
+        const changed = (await qr.query(
+          `UPDATE listings SET status = $2, updated_at = NOW()
+            WHERE id = $1 AND seller_id = $3 AND status = 'active' AND deleted_at IS NULL
+            RETURNING id`,
+          [listingId, status, userId],
+        )) as [Array<{ id: string }>, number];
+        if (!Array.isArray(changed[0]) || changed[0].length !== 1) {
+          throw new ConflictException({
+            code: 'listing.not_active', message: 'This listing is no longer active.',
+          });
+        }
+
+        // Manual sold/withdrawn must not leave actionable pending offers behind.
+        await qr.query(
+          `UPDATE trade_offers SET status = 'declined', updated_at = NOW()
+            WHERE listing_id = $1 AND status = 'pending'`,
+          [listingId],
+        );
+      }
+    });
     return this.detail(userId, listingId);
   }
 
   async makeOffer(buyerId: string, listingId: string, dto: MakeOfferDto): Promise<ListingOffer> {
-    const [listing] = (await this.db.query(
-      `SELECT l.seller_id, l.status
-         FROM listings l
-        WHERE l.id = $1
-          AND l.deleted_at IS NULL
-          AND (l.visibility = 'public' OR l.seller_id = $2)
-          AND NOT EXISTS (
-                SELECT 1 FROM user_blocks ub
-                 WHERE (ub.blocker_id = $2 AND ub.blocked_id = l.seller_id)
-                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $2)
-              )`,
-      [listingId, buyerId],
-    )) as Array<{ seller_id: string; status: ListingStatus }>;
-    if (!listing) {
-      throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
-    }
-    if (listing.seller_id === buyerId) {
-      throw new ForbiddenException({
-        code: 'listing.own_offer',
-        message: "You can't make an offer on your own listing.",
-      });
-    }
-    if (listing.status !== 'active') {
-      throw new ConflictException({
-        code: 'listing.not_active',
-        message: 'This listing is no longer accepting offers.',
-      });
-    }
-    await this.db.query(
-      `INSERT INTO trade_offers (listing_id, buyer_id, offer_cents, message, status, last_actor)
-            VALUES ($1, $2, $3, $4, 'pending', 'buyer')
-       ON CONFLICT (listing_id, buyer_id)
-       DO UPDATE SET offer_cents = EXCLUDED.offer_cents,
-                     message     = EXCLUDED.message,
-                     status      = 'pending',
-                     last_actor  = 'buyer',
-                     updated_at  = NOW()`,
-      [listingId, buyerId, dto.offerCents ?? null, dto.message ?? null],
-    );
+    await this.withMarketplaceTransaction(async (qr) => {
+      // Every offer mutation acquires the listing lock before modifying an offer.
+      const [listing] = (await qr.query(
+        `SELECT l.seller_id, l.status
+           FROM listings l
+          WHERE l.id = $1
+            AND l.deleted_at IS NULL
+            AND (l.visibility = 'public' OR l.seller_id = $2)
+            AND NOT EXISTS (
+                  SELECT 1 FROM user_blocks ub
+                   WHERE (ub.blocker_id = $2 AND ub.blocked_id = l.seller_id)
+                      OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $2)
+                )
+          FOR UPDATE OF l`,
+        [listingId, buyerId],
+      )) as Array<{ seller_id: string; status: ListingStatus }>;
+      if (!listing) {
+        throw new NotFoundException({ code: 'listing.not_found', message: 'Listing not found.' });
+      }
+      if (listing.seller_id === buyerId) {
+        throw new ForbiddenException({
+          code: 'listing.own_offer',
+          message: "You can't make an offer on your own listing.",
+        });
+      }
+      if (listing.status !== 'active') {
+        throw new ConflictException({
+          code: 'listing.not_active',
+          message: 'This listing is no longer accepting offers.',
+        });
+      }
+      const upserted = (await qr.query(
+        `INSERT INTO trade_offers (listing_id, buyer_id, offer_cents, message, status, last_actor)
+              VALUES ($1, $2, $3, $4, 'pending', 'buyer')
+         ON CONFLICT (listing_id, buyer_id)
+         DO UPDATE SET offer_cents = EXCLUDED.offer_cents,
+                       message     = EXCLUDED.message,
+                       status      = 'pending',
+                       last_actor  = 'buyer',
+                       updated_at  = NOW()
+          WHERE trade_offers.status = 'pending'
+          RETURNING id`,
+        [listingId, buyerId, dto.offerCents ?? null, dto.message ?? null],
+      )) as [Array<{ id: string }>, number];
+      if (!Array.isArray(upserted[0]) || upserted[0].length !== 1) {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'A completed offer cannot be reopened.',
+        });
+      }
+    });
     return this.getOffer(listingId, buyerId);
   }
 
@@ -294,57 +422,44 @@ export class ListingsService {
     offerId: string,
     dto: CounterOfferDto,
   ): Promise<ListingOffer> {
-    const [row] = (await this.db.query(
-      `SELECT o.id, o.listing_id, o.buyer_id, o.status, l.seller_id, l.status AS listing_status
-         FROM trade_offers o
-         JOIN listings l ON l.id = o.listing_id
-        WHERE o.id = $1
-          AND l.deleted_at IS NULL
-          AND NOT EXISTS (
-                SELECT 1 FROM user_blocks ub
-                 WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
-                    OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
-              )`,
-      [offerId],
-    )) as Array<{
-      id: string;
-      listing_id: string;
-      buyer_id: string;
-      status: OfferStatus;
-      seller_id: string;
-      listing_status: ListingStatus;
-    }>;
-    if (!row) {
-      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-    }
-    if (row.seller_id !== sellerId) {
-      throw new ForbiddenException({
-        code: 'offer.not_seller',
-        message: 'Only the seller can counter this offer.',
-      });
-    }
-    if (row.listing_status !== 'active') {
-      throw new ConflictException({
-        code: 'listing.not_active',
-        message: 'This listing is no longer accepting negotiation.',
-      });
-    }
-    if (row.status !== 'pending') {
-      throw new ConflictException({
-        code: 'offer.not_pending',
-        message: 'Only pending offers can be countered.',
-      });
-    }
-    await this.db.query(
-      `UPDATE trade_offers
-          SET offer_cents = $2,
-              message     = $3,
-              status      = 'pending',
-              last_actor  = 'seller',
-              updated_at  = NOW()
-        WHERE id = $1`,
-      [offerId, dto.offerCents, dto.message ?? null],
-    );
+    await this.withMarketplaceTransaction(async (qr) => {
+      const row = await this.lockOfferForUpdate(qr, offerId);
+      if (row.seller_id !== sellerId) {
+        throw new ForbiddenException({
+          code: 'offer.not_seller',
+          message: 'Only the seller can counter this offer.',
+        });
+      }
+      if (row.listing_status !== 'active') {
+        throw new ConflictException({
+          code: 'listing.not_active',
+          message: 'This listing is no longer accepting negotiation.',
+        });
+      }
+      if (row.status !== 'pending') {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be countered.',
+        });
+      }
+      const updated = (await qr.query(
+        `UPDATE trade_offers
+            SET offer_cents = $2,
+                message     = $3,
+                status      = 'pending',
+                last_actor  = 'seller',
+                updated_at  = NOW()
+          WHERE id = $1 AND status = 'pending'
+          RETURNING id`,
+        [offerId, dto.offerCents, dto.message ?? null],
+      )) as [Array<{ id: string }>, number];
+      if (!Array.isArray(updated[0]) || updated[0].length !== 1) {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be countered.',
+        });
+      }
+    });
     return this.getOfferById(offerId);
   }
 
@@ -380,29 +495,9 @@ export class ListingsService {
     offerId: string,
     status: 'accepted' | 'declined',
   ): Promise<ListingOffer> {
-    const qr = this.db.createQueryRunner();
-    await qr.connect();
-    await qr.startTransaction();
-    try {
-      const [offer] = await qr.query(
-        `SELECT o.listing_id, o.buyer_id, o.status AS offer_status, o.last_actor,
-                l.seller_id, l.status AS listing_status
-           FROM trade_offers o
-           JOIN listings l ON l.id = o.listing_id
-          WHERE o.id = $1
-            AND l.deleted_at IS NULL
-            AND NOT EXISTS (
-                  SELECT 1 FROM user_blocks ub
-                   WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
-                      OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
-                )
-          FOR UPDATE OF o`,
-        [offerId],
-      );
-      if (!offer) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-      if (offer.offer_status !== 'pending') {
+    await this.withMarketplaceTransaction(async (qr) => {
+      const offer = await this.lockOfferForUpdate(qr, offerId);
+      if (offer.status !== 'pending') {
         throw new ConflictException({
           code: 'offer.not_pending',
           message: 'Only pending offers can be accepted or declined.',
@@ -418,9 +513,9 @@ export class ListingsService {
       const isBuyer = offer.buyer_id === userId;
       const waitingOnBuyer = offer.last_actor === 'seller';
       if (isSeller) {
-        // ok
+        // Seller may always answer a buyer offer or their own counter.
       } else if (isBuyer && waitingOnBuyer) {
-        // ok
+        // Buyer may answer only after the seller has made a counter.
       } else if (isBuyer) {
         throw new ForbiddenException({
           code: 'offer.not_your_turn',
@@ -432,47 +527,93 @@ export class ListingsService {
           message: 'You cannot respond to this offer.',
         });
       }
-      await qr.query(
-        `UPDATE trade_offers SET status = $2, updated_at = NOW() WHERE id = $1`,
+
+      const changed = (await qr.query(
+        `UPDATE trade_offers
+            SET status = $2, updated_at = NOW()
+          WHERE id = $1 AND status = 'pending'
+          RETURNING id`,
         [offerId, status],
-      );
+      )) as [Array<{ id: string }>, number];
+      if (!Array.isArray(changed[0]) || changed[0].length !== 1) {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be accepted or declined.',
+        });
+      }
       if (status === 'accepted') {
-        await qr.query(
-          `UPDATE listings SET status = 'sold', updated_at = NOW() WHERE id = $1`,
+        const soldResult = (await qr.query(
+          `UPDATE listings
+              SET status = 'sold', updated_at = NOW()
+            WHERE id = $1
+              AND status = 'active'
+              AND deleted_at IS NULL
+            RETURNING id`,
           [offer.listing_id],
-        );
+        )) as [Array<{ id: string }>, number];
+        if (!Array.isArray(soldResult[0]) || soldResult[0].length !== 1) {
+          throw new ConflictException({
+            code: 'listing.not_active',
+            message: 'This listing is no longer accepting offers.',
+          });
+        }
         await qr.query(
           `UPDATE trade_offers SET status = 'declined', updated_at = NOW()
             WHERE listing_id = $1 AND id <> $2 AND status = 'pending'`,
           [offer.listing_id, offerId],
         );
       }
-      await qr.commitTransaction();
-      return this.getOfferById(offerId);
-    } catch (err) {
-      await qr.rollbackTransaction();
-      throw err;
-    } finally {
-      await qr.release();
-    }
+    });
+    return this.getOfferById(offerId);
   }
 
   async withdrawOffer(buyerId: string, listingId: string): Promise<ListingOffer> {
-    const [existing] = (await this.db.query(
-      `SELECT id FROM trade_offers WHERE listing_id = $1 AND buyer_id = $2`,
-      [listingId, buyerId],
-    )) as Array<{ id: string }>;
-    if (!existing) {
-      throw new NotFoundException({ code: 'offer.not_found', message: 'You have no offer to withdraw.' });
-    }
-    await this.db.query(
-      `UPDATE trade_offers SET status = 'withdrawn', updated_at = NOW()
-        WHERE listing_id = $1 AND buyer_id = $2`,
-      [listingId, buyerId],
-    );
+    await this.withMarketplaceTransaction(async (qr) => {
+      // Always lock the listing before locking a specific offer.
+      const [listing] = (await qr.query(
+        `SELECT id, status FROM listings WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+        [listingId],
+      )) as Array<{ id: string; status: ListingStatus }>;
+      if (!listing) {
+        throw new NotFoundException({ code: 'offer.not_found', message: 'You have no offer to withdraw.' });
+      }
+
+      const [offer] = (await qr.query(
+        `SELECT id, status FROM trade_offers
+          WHERE listing_id = $1 AND buyer_id = $2 FOR UPDATE`,
+        [listingId, buyerId],
+      )) as Array<{ id: string; status: OfferStatus }>;
+      if (!offer) {
+        throw new NotFoundException({ code: 'offer.not_found', message: 'You have no offer to withdraw.' });
+      }
+      if (listing.status !== 'active') {
+        throw new ConflictException({
+          code: 'listing.not_active',
+          message: 'This listing is no longer accepting negotiation.',
+        });
+      }
+      if (offer.status !== 'pending') {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be withdrawn.',
+        });
+      }
+
+      const withdrawn = (await qr.query(
+        `UPDATE trade_offers SET status = 'withdrawn', updated_at = NOW()
+          WHERE id = $1 AND listing_id = $2 AND buyer_id = $3 AND status = 'pending'
+          RETURNING id`,
+        [offer.id, listingId, buyerId],
+      )) as [Array<{ id: string }>, number];
+      if (!Array.isArray(withdrawn[0]) || withdrawn[0].length !== 1) {
+        throw new ConflictException({
+          code: 'offer.not_pending',
+          message: 'Only pending offers can be withdrawn.',
+        });
+      }
+    });
     return this.getOffer(listingId, buyerId);
   }
-
   async toggleFavorite(userId: string, listingId: string): Promise<ToggleFavoriteResponse> {
     await this.assertListingAccessible(userId, listingId);
     const [existing] = (await this.db.query(

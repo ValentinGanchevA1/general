@@ -62,6 +62,16 @@ describe('ListingsService', () => {
     expect(sql).toContain(`blocked_id = ${left}`);
   };
 
+  const expectTransactionRollback = (
+    runner: ReturnType<typeof makeQueryRunner>['runner'],
+    calls: ReturnType<typeof makeQueryRunner>['calls'],
+    expectedCalls: number,
+  ): void => {
+    expect(calls).toHaveLength(expectedCalls);
+    expect(runner.rollbackTransaction).toHaveBeenCalled();
+    expect(runner.commitTransaction).not.toHaveBeenCalled();
+  };
+
   const listingDetailRow = (overrides: Record<string, unknown> = {}) => ({
     id: 'l1',
     seller_id: 's1',
@@ -94,7 +104,7 @@ describe('ListingsService', () => {
           seller_id: 's1',
           title: 'Bike',
           price_cents: 10000,
-          currency: 'USD',
+           currency: 'USD',
           category: 'goods',
           status: 'active',
           mode: 'sell',
@@ -171,127 +181,451 @@ describe('ListingsService', () => {
 
   describe('makeOffer', () => {
     it('forbids the seller offering on their own listing', async () => {
-      query.mockResolvedValueOnce([{ seller_id: 'me', status: 'active' }]);
-      await expect(
-        service.makeOffer('me', 'l1', { offerCents: 100 }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      const { runner } = makeQueryRunner([[{ seller_id: 'me', status: 'active' }]]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.makeOffer('me', 'l1', { offerCents: 100 }))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
 
     it('hides a private or blocked-seller listing before an offer can be inserted', async () => {
-      query.mockResolvedValueOnce([]);
-
-      await expect(
-        service.makeOffer('b1', 'l1', { offerCents: 100 }),
-      ).rejects.toBeInstanceOf(NotFoundException);
-
-      expect(query).toHaveBeenCalledTimes(1);
-      const [sql, params] = query.mock.calls[0]!;
-      expectBilateralBlockPredicate(String(sql), '$2', 'l.seller_id');
-      expect(params).toEqual(['l1', 'b1']);
+      const { runner, calls } = makeQueryRunner([[]]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.makeOffer('b1', 'l1', { offerCents: 100 }))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.sql).toContain('FOR UPDATE OF l');
+      expectBilateralBlockPredicate(calls[0]!.sql, '$2', 'l.seller_id');
+      expect(calls[0]!.params).toEqual(['l1', 'b1']);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
     });
 
-    it('rejects offers on a non-active listing', async () => {
-      query.mockResolvedValueOnce([{ seller_id: 's1', status: 'sold' }]);
-      await expect(
-        service.makeOffer('b1', 'l1', { offerCents: 100 }),
-      ).rejects.toBeInstanceOf(ConflictException);
+    it('rejects offers on a sold listing without upserting', async () => {
+      const { runner, calls } = makeQueryRunner([[{ seller_id: 's1', status: 'sold' }]]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.makeOffer('b1', 'l1', { offerCents: 100 }))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 1);
     });
 
-    it('upserts the offer and returns it', async () => {
-      query
-        .mockResolvedValueOnce([{ seller_id: 's1', status: 'active' }])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'o1',
-            listing_id: 'l1',
-            buyer_id: 'b1',
-            offer_cents: 4500,
-            message: null,
-            status: 'pending',
-            last_actor: 'buyer',
-            created_at: new Date('2026-06-12T00:00:00Z'),
-            buyer_display_name: 'Bob',
-            buyer_avatar_url: null,
-          },
-        ]);
-
+    it('upserts the offer inside the listing transaction and returns it', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ seller_id: 's1', status: 'active' }],
+        [[{ id: 'o1' }], 1],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      query.mockResolvedValueOnce([{
+        id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 4500,
+        message: null, status: 'pending', last_actor: 'buyer',
+        created_at: new Date('2026-06-12T00:00:00Z'),
+        buyer_display_name: 'Bob', buyer_avatar_url: null,
+      }]);
       const res = await service.makeOffer('b1', 'l1', { offerCents: 4500 });
-      expect(res).toMatchObject({ id: 'o1', status: 'pending', offerCents: 4500, buyerDisplayName: 'Bob' });
+      expect(res).toMatchObject({ id: 'o1', status: 'pending', offerCents: 4500 });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]!.sql).toContain('FOR UPDATE OF l');
+      expect(calls[1]!.sql).toContain('ON CONFLICT');
+      expect(runner.commitTransaction).toHaveBeenCalled();
+      expect(runner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it.each(['withdrawn', 'declined', 'accepted'] as const)(
+      'does not reopen a %s offer when the listing remains active', async () => {
+        const { runner, calls } = makeQueryRunner([
+          [{ seller_id: 's1', status: 'active' }],
+          [[], 0],
+        ]);
+        createQueryRunner.mockReturnValue(runner);
+        await expect(service.makeOffer('b1', 'l1', { offerCents: 4500 }))
+          .rejects.toBeInstanceOf(ConflictException);
+        expect(calls).toHaveLength(2);
+        expect(calls[1]!.sql).toContain("WHERE trade_offers.status = 'pending'");
+        expect(calls[1]!.sql).toContain('RETURNING id');
+        expect(runner.rollbackTransaction).toHaveBeenCalled();
+        expect(runner.commitTransaction).not.toHaveBeenCalled();
+      },
+    );
+    it('rolls back when the offer upsert fails', async () => {
+      const { runner, query: runnerQuery } = makeQueryRunner([]);
+      runnerQuery
+        .mockResolvedValueOnce([{ seller_id: 's1', status: 'active' }])
+        .mockRejectedValueOnce(new Error('synthetic insert failure'));
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.makeOffer('b1', 'l1', { offerCents: 4500 }))
+        .rejects.toThrow('synthetic insert failure');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
   });
-
   describe('counterOffer', () => {
     it('hides an offer when buyer and seller are blocked in either direction', async () => {
-      query.mockResolvedValueOnce([]);
-
+      const { runner, calls } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
       await expect(
         service.counterOffer('s1', 'o1', { offerCents: 5000 } as never),
       ).rejects.toBeInstanceOf(NotFoundException);
+      expect(calls).toHaveLength(3);
+      expectBilateralBlockPredicate(calls[2]!.sql, 'l.seller_id', 'o.buyer_id');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
+    });
 
-      expect(query).toHaveBeenCalledTimes(1);
-      expectBilateralBlockPredicate(String(query.mock.calls[0]![0]), 'l.seller_id', 'o.buyer_id');
+    it('locks listing before offer and commits an authorized pending counter', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          id: 'o1', listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          status: 'pending', listing_status: 'active',
+        }],
+        [[{ id: 'o1' }], 1],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      query.mockResolvedValueOnce([{
+        id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 5000,
+        message: null, status: 'pending', last_actor: 'seller',
+        created_at: new Date('2026-06-12T00:00:00Z'),
+        buyer_display_name: 'Bob', buyer_avatar_url: null,
+      }]);
+      const result = await service.counterOffer('s1', 'o1', { offerCents: 5000 } as never);
+      expect(result.status).toBe('pending');
+      expect(calls).toHaveLength(4);
+      expect(calls[1]!.sql).toContain('FROM listings');
+      expect(calls[1]!.sql).toContain('FOR UPDATE');
+      expect(calls[2]!.sql).toContain('FOR UPDATE OF o');
+      expect(calls[3]!.sql).toContain("status = 'pending'");
+      expect(calls[3]!.sql).toContain('RETURNING id');
+      expect(runner.commitTransaction).toHaveBeenCalled();
+      expect(runner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back if the offer was already changed', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          id: 'o1', listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          status: 'accepted', listing_status: 'active',
+        }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.counterOffer('s1', 'o1', { offerCents: 5000 } as never))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 3);
+    });
+
+    it('rolls back when a conditional offer update returns no rows', async () => {
+      const { runner } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          id: 'o1', listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          status: 'pending', listing_status: 'active',
+        }],
+        [[], 0],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.counterOffer('s1', 'o1', { offerCents: 5000 } as never))
+        .rejects.toBeInstanceOf(ConflictException);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
   });
 
   describe('respondToOffer', () => {
     it('hides a blocked buyer/seller offer before any transactional mutation', async () => {
-      const { runner, calls } = makeQueryRunner([[]]);
+      const { runner, calls } = makeQueryRunner([
+        [{ listing_id: 'l1' }], // Look up listing without locking offer
+        [{ id: 'l1' }], // Lock listing first
+        [], // Offer query excludes blocked users
+      ]);
       createQueryRunner.mockReturnValue(runner);
 
       await expect(
         service.respondToOffer('s1', 'o1', 'accepted'),
       ).rejects.toBeInstanceOf(NotFoundException);
 
-      expect(calls).toHaveLength(1);
-      expectBilateralBlockPredicate(calls[0]!.sql, 'l.seller_id', 'o.buyer_id');
+      expect(calls).toHaveLength(3);
+      expectBilateralBlockPredicate(calls[2]!.sql, 'l.seller_id', 'o.buyer_id');
       expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
 
     it('forbids a non-seller', async () => {
       const { runner } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 'someone-else',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
         }],
       ]);
       createQueryRunner.mockReturnValue(runner);
+
       await expect(
         service.respondToOffer('not-seller', 'o1', 'accepted'),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
 
     it('accepting marks the listing sold and declines the rest', async () => {
       const { runner, query: qrq } = makeQueryRunner([
+        [{ listing_id: 'l1' }], // Resolve listing ID
+        [{ id: 'l1' }], // Lock listing
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
-        }], // SELECT FOR UPDATE
-        [], // UPDATE this offer -> accepted
-        [], // UPDATE listings -> sold
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
+           }], // Lock offer and validate authorization
+        [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
+        [[{ id: 'l1' }], 1], // UPDATE listings -> sold RETURNING id
         [], // UPDATE other pending offers -> declined
       ]);
       createQueryRunner.mockReturnValue(runner);
       // getOfferById runs on the pooled connection (this.db.query), not the runner.
-      query.mockResolvedValueOnce([
-        {
-          id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 4500, message: null,
-          status: 'accepted', last_actor: 'buyer', created_at: new Date('2026-06-12T00:00:00Z'),
-          buyer_display_name: 'Bob', buyer_avatar_url: null,
-        },
-      ]);
+      query.mockResolvedValueOnce([{
+        id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 4500, message: null,
+        status: 'accepted', last_actor: 'buyer', created_at: new Date('2026-06-12T00:00:00Z'),
+        buyer_display_name: 'Bob', buyer_avatar_url: null,
+      }]);
 
       const res = await service.respondToOffer('s1', 'o1', 'accepted');
       expect(res.status).toBe('accepted');
-      // 4 statements: lock + accept + sell + decline-others
-      expect(qrq).toHaveBeenCalledTimes(4);
-      const sql = qrq.mock.calls.map((c) => String(c[0])).join(' | ');
-      expect(sql).toContain("status = 'sold'");
+      expect(qrq).toHaveBeenCalledTimes(6);
+
+      const sqlCalls = qrq.mock.calls.map((call) => String(call[0]));
+      expect(sqlCalls[0]).toContain('SELECT listing_id');
+      expect(sqlCalls[1]).toContain('FROM listings');
+      expect(sqlCalls[1]).toContain('FOR UPDATE');
+      expect(sqlCalls[2]).toContain('FOR UPDATE OF o');
+      expect(sqlCalls[4]).toContain("status = 'active'");
+      expect(sqlCalls[4]).toContain('RETURNING id');
       expect(runner.commitTransaction).toHaveBeenCalled();
+      expect(runner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back when another offer already sold the listing', async () => {
+      const { runner, query: qrq } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
+        }],
+        [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
+        [[], 0], // Conditional UPDATE listings returns no rows
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+
+      await expect(
+        service.respondToOffer('s1', 'o1', 'accepted'),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(qrq).toHaveBeenCalledTimes(5);
+      expect(String(qrq.mock.calls[4]![0])).toContain("status = 'active'");
+      expect(String(qrq.mock.calls[4]![0])).toContain('RETURNING id');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rolls back when conditional offer update affects zero rows', async () => {
+      const { runner, query: qrq } = makeQueryRunner([
+        [{ listing_id: 'l1' }],
+        [{ id: 'l1' }],
+        [{
+          listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
+        }],
+        [[], 0],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+
+      await expect(
+        service.respondToOffer('s1', 'o1', 'accepted'),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(qrq).toHaveBeenCalledTimes(4);
+      expect(String(qrq.mock.calls[3]![0])).toContain("status = 'pending'");
+      expect(String(qrq.mock.calls[3]![0])).toContain('RETURNING id');
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+      expect(runner.commitTransaction).not.toHaveBeenCalled();
     });
   });
 
+  describe('updateStatus lifecycle', () => {
+    it('manually sells an active listing and declines outstanding pending offers', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: 'active' }],
+        [[{ id: 'l1' }], 1],
+        [[], 2],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      // get detail after commit is a separate API read; mock it to isolate mutation.
+      jest.spyOn(service, 'detail').mockResolvedValueOnce({ status: 'sold' } as never);
+      const result = await service.updateStatus('s1', 'l1', 'sold');
+      expect(result.status).toBe('sold');
+      expect(calls).toHaveLength(3);
+      expect(calls[0]!.sql).toContain('FOR UPDATE');
+      expect(calls[0]!.sql).toContain('FROM listings');
+      expect(calls[1]!.sql).toContain("status = 'active'");
+      expect(calls[1]!.params).toEqual(['l1', 'sold', 's1']);
+      expect(calls[2]!.sql).toContain('UPDATE trade_offers');
+      expect(calls[2]!.sql).toContain("status = 'pending'");
+      expect(runner.commitTransaction).toHaveBeenCalled();
+      expect(runner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('withdraws active listing and declines pending offers atomically', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: 'active' }],
+        [[{ id: 'l1' }], 1],
+        [[], 2],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      jest.spyOn(service, 'detail').mockResolvedValueOnce({ status: 'withdrawn' } as never);
+      await service.updateStatus('s1', 'l1', 'withdrawn');
+      expect(calls[1]!.params).toEqual(['l1', 'withdrawn', 's1']);
+      expect(calls[2]!.sql).toContain('UPDATE trade_offers');
+      expect(runner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it('treats same status as idempotent without mutating offers', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: 'active' }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      jest.spyOn(service, 'detail').mockResolvedValueOnce({ status: 'active' } as never);
+      await service.updateStatus('s1', 'l1', 'active');
+      expect(calls).toHaveLength(1);
+      expect(runner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['sold', 'active'],
+      ['sold', 'withdrawn'],
+      ['withdrawn', 'active'],
+      ['withdrawn', 'sold'],
+    ] as const)('rejects terminal listing transition %s -> %s', async (current, next) => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: current }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.updateStatus('s1', 'l1', next))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 1);
+    });
+
+    it('rejects a different seller before writing', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: 'active' }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.updateStatus('other', 'l1', 'sold'))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      expect(calls).toHaveLength(1);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('returns not found for a missing or deleted listing', async () => {
+      const { runner, calls } = makeQueryRunner([[]]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.updateStatus('s1', 'missing', 'sold'))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(calls).toHaveLength(1);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('rolls back when conditional listing update affects zero rows', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', seller_id: 's1', status: 'active' }],
+        [[], 0],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.updateStatus('s1', 'l1', 'sold'))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 2);
+    });
+  });
+  describe('withdrawOffer', () => {
+    it('locks listing before buyer offer and withdraws only pending offer', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', status: 'active' }],
+        [{ id: 'o1', status: 'pending' }],
+        [[{ id: 'o1' }], 1],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      query.mockResolvedValueOnce([{
+        id: 'o1', listing_id: 'l1', buyer_id: 'b1', offer_cents: 4500,
+        message: null, status: 'withdrawn', last_actor: 'buyer',
+        created_at: new Date('2026-06-12T00:00:00Z'),
+        buyer_display_name: 'Bob', buyer_avatar_url: null,
+      }]);
+
+      const result = await service.withdrawOffer('b1', 'l1');
+      expect(result.status).toBe('withdrawn');
+      expect(calls).toHaveLength(3);
+      expect(calls[0]!.sql).toContain('FROM listings');
+      expect(calls[0]!.sql).toContain('FOR UPDATE');
+      expect(calls[1]!.sql).toContain('buyer_id = $2 FOR UPDATE');
+      expect(calls[1]!.params).toEqual(['l1', 'b1']);
+      expect(calls[2]!.sql).toContain("status = 'pending'");
+      expect(calls[2]!.sql).toContain('RETURNING id');
+      expect(runner.commitTransaction).toHaveBeenCalled();
+      expect(runner.rollbackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite an accepted offer', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', status: 'active' }],
+        [{ id: 'o1', status: 'accepted' }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.withdrawOffer('b1', 'l1'))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 2);
+    });
+
+    it('does not withdraw an offer on a sold listing', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', status: 'sold' }],
+        [{ id: 'o1', status: 'pending' }],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.withdrawOffer('b1', 'l1'))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 2);
+    });
+
+    it('does not disclose or mutate another buyer offer', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', status: 'active' }],
+        [],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.withdrawOffer('different-buyer', 'l1'))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(calls).toHaveLength(2);
+      expect(calls[1]!.params).toEqual(['l1', 'different-buyer']);
+      expect(runner.rollbackTransaction).toHaveBeenCalled();
+    });
+
+    it('rolls back if the conditional withdraw returns no rows', async () => {
+      const { runner, calls } = makeQueryRunner([
+        [{ id: 'l1', status: 'active' }],
+        [{ id: 'o1', status: 'pending' }],
+        [[], 0],
+      ]);
+      createQueryRunner.mockReturnValue(runner);
+      await expect(service.withdrawOffer('b1', 'l1'))
+        .rejects.toBeInstanceOf(ConflictException);
+      expectTransactionRollback(runner, calls, 3);
+    });
+  });
   describe('listOffers', () => {
     it('seller scope hides blocked buyers while keeping the seller as the access viewer', async () => {
       query
