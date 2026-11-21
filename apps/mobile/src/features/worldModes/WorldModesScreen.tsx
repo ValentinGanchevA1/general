@@ -69,6 +69,7 @@ function createStyles(colors: ThemeColors) {
     ctaText: { color: colors.bg, fontSize: fontSize.md, fontWeight: '800' },
     error: { color: colors.danger, fontSize: fontSize.sm, marginBottom: spacing.sm },
     hint: { color: colors.textTertiary, textAlign: 'center', marginTop: spacing.sm, fontSize: fontSize.xs },
+    scopeNote: { color: colors.textSecondary, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md, fontSize: fontSize.xs, lineHeight: 18 },
     skipAction: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
     skipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '700' },
   });
@@ -143,6 +144,7 @@ export function WorldModesScreen({ onComplete }: WorldModesScreenProps = {}): Re
         <Text style={[styles.eyebrow, { marginTop: spacing.xl }]}>NEXUS WORLDS 2.0</Text>
         <Text style={styles.heroTitle}>Choose your world.</Text>
         <Text style={styles.intro}>{onComplete ? "Choose the world that best fits your experience. You can switch worlds later in Identity." : "Same people. Same places. A new perspective. Preview freely; activate without changing your privacy or access."}</Text>
+        <Text style={styles.scopeNote}>Early version: World Modes personalize visual accents and portal entry. They do not change visibility, permissions, trust, ranking or feature access.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           {FILTERS.map((item) => (
             <TouchableOpacity
