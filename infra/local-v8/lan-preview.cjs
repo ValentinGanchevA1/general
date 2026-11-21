@@ -10,7 +10,7 @@ const ROOT = resolve(__dirname, '..', '..', 'web');
 const PORT = 4176;
 const MIME = {
   '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8',
-  '.js':'text/javascript; charset=utf-8', '.map':'application/json; charset=utf-8',
+  '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.map':'application/json; charset=utf-8',
   '.svg':'image/svg+xml',
 };
 const METHODS = new Set(['GET', 'HEAD']);
