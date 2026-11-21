@@ -52,6 +52,17 @@ interface ListingRow {
   favorited_by_me: boolean;
 }
 
+
+interface LockedOfferRow {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  status: OfferStatus;
+  last_actor: 'buyer' | 'seller' | null;
+  seller_id: string;
+  listing_status: ListingStatus;
+}
+
 interface OfferRow {
   id: string;
   listing_id: string;
@@ -94,6 +105,47 @@ export class ListingsService {
     } finally {
       if (connected) await queryRunner.release();
     }
+  }
+
+  private async lockOfferForUpdate(
+    queryRunner: QueryRunner,
+    offerId: string,
+  ): Promise<LockedOfferRow> {
+    const [offerRef] = (await queryRunner.query(
+      `SELECT listing_id FROM trade_offers WHERE id = $1`,
+      [offerId],
+    )) as Array<{ listing_id: string }>;
+    if (!offerRef) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+
+    const [listing] = (await queryRunner.query(
+      `SELECT id FROM listings WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+      [offerRef.listing_id],
+    )) as Array<{ id: string }>;
+    if (!listing) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+
+    const [offer] = (await queryRunner.query(
+      `SELECT o.id, o.listing_id, o.buyer_id, o.status, o.last_actor,
+              l.seller_id, l.status AS listing_status
+         FROM trade_offers o
+         JOIN listings l ON l.id = o.listing_id
+        WHERE o.id = $1
+          AND l.deleted_at IS NULL
+          AND NOT EXISTS (
+                SELECT 1 FROM user_blocks ub
+                 WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
+                    OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
+              )
+        FOR UPDATE OF o`,
+      [offerId],
+    )) as Array<LockedOfferRow>;
+    if (!offer) {
+      throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
+    }
+    return offer;
   }
 
   async uploadImage(
@@ -369,49 +421,7 @@ export class ListingsService {
     dto: CounterOfferDto,
   ): Promise<ListingOffer> {
     await this.withMarketplaceTransaction(async (qr) => {
-      // Read the listing ID without acquiring an offer row lock.
-      const [offerRef] = (await qr.query(
-        `SELECT listing_id FROM trade_offers WHERE id = $1`,
-        [offerId],
-      )) as Array<{ listing_id: string }>;
-      if (!offerRef) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-
-      // Shared order across Marketplace mutations: listing, then offer.
-      const [lockedListing] = (await qr.query(
-        `SELECT id FROM listings WHERE id = $1 FOR UPDATE`,
-        [offerRef.listing_id],
-      )) as Array<{ id: string }>;
-      if (!lockedListing) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-
-      // Re-read authorization and business state after obtaining the locks.
-      const [row] = (await qr.query(
-        `SELECT o.id, o.listing_id, o.buyer_id, o.status, l.seller_id, l.status AS listing_status
-           FROM trade_offers o
-           JOIN listings l ON l.id = o.listing_id
-          WHERE o.id = $1
-            AND l.deleted_at IS NULL
-            AND NOT EXISTS (
-                  SELECT 1 FROM user_blocks ub
-                   WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
-                      OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
-                )
-          FOR UPDATE OF o`,
-        [offerId],
-      )) as Array<{
-        id: string;
-        listing_id: string;
-        buyer_id: string;
-        status: OfferStatus;
-        seller_id: string;
-        listing_status: ListingStatus;
-      }>;
-      if (!row) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
+      const row = await this.lockOfferForUpdate(qr, offerId);
       if (row.seller_id !== sellerId) {
         throw new ForbiddenException({
           code: 'offer.not_seller',
@@ -484,49 +494,8 @@ export class ListingsService {
     status: 'accepted' | 'declined',
   ): Promise<ListingOffer> {
     await this.withMarketplaceTransaction(async (qr) => {
-      // Read the listing ID first, then apply the shared listing-before-offer lock order.
-      const [offerRef] = (await qr.query(
-        `SELECT listing_id FROM trade_offers WHERE id = $1`,
-        [offerId],
-      )) as Array<{ listing_id: string }>;
-      if (!offerRef) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-
-      const [lockedListing] = (await qr.query(
-        `SELECT id FROM listings WHERE id = $1 FOR UPDATE`,
-        [offerRef.listing_id],
-      )) as Array<{ id: string }>;
-      if (!lockedListing) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-
-      const [offer] = (await qr.query(
-        `SELECT o.listing_id, o.buyer_id, o.status AS offer_status, o.last_actor,
-                l.seller_id, l.status AS listing_status
-           FROM trade_offers o
-           JOIN listings l ON l.id = o.listing_id
-          WHERE o.id = $1
-            AND l.deleted_at IS NULL
-            AND NOT EXISTS (
-                  SELECT 1 FROM user_blocks ub
-                   WHERE (ub.blocker_id = l.seller_id AND ub.blocked_id = o.buyer_id)
-                      OR (ub.blocker_id = o.buyer_id AND ub.blocked_id = l.seller_id)
-                )
-          FOR UPDATE OF o`,
-        [offerId],
-      )) as Array<{
-        listing_id: string;
-        buyer_id: string;
-        offer_status: OfferStatus;
-        last_actor: 'buyer' | 'seller' | null;
-        seller_id: string;
-        listing_status: ListingStatus;
-      }>;
-      if (!offer) {
-        throw new NotFoundException({ code: 'offer.not_found', message: 'Offer not found.' });
-      }
-      if (offer.offer_status !== 'pending') {
+      const offer = await this.lockOfferForUpdate(qr, offerId);
+      if (offer.status !== 'pending') {
         throw new ConflictException({
           code: 'offer.not_pending',
           message: 'Only pending offers can be accepted or declined.',
