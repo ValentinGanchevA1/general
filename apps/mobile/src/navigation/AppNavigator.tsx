@@ -376,8 +376,10 @@ export function AppNavigator(): React.JSX.Element {
 
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
 	useEffect(() => {
-		if (userId && WORLD_MODES_ENABLED) void dispatch(hydrateWorldMode(userId));
-	}, [dispatch, userId]);
+		if (WORLD_MODES_ENABLED && userId && !restoring) {
+			void dispatch(hydrateWorldMode(userId));
+		}
+	}, [dispatch, userId, restoring]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
