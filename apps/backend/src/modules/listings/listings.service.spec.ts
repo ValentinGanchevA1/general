@@ -362,7 +362,7 @@ describe('ListingsService', () => {
         [{ id: 'l1' }],
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 'someone-else',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
         }],
       ]);
       createQueryRunner.mockReturnValue(runner);
@@ -380,7 +380,7 @@ describe('ListingsService', () => {
         [{ id: 'l1' }], // Lock listing
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
            }], // Lock offer and validate authorization
         [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
         [[{ id: 'l1' }], 1], // UPDATE listings -> sold RETURNING id
@@ -415,7 +415,7 @@ describe('ListingsService', () => {
         [{ id: 'l1' }],
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
         }],
         [[{ id: 'o1' }], 1], // UPDATE offer RETURNING id
         [[], 0], // Conditional UPDATE listings returns no rows
@@ -439,7 +439,7 @@ describe('ListingsService', () => {
         [{ id: 'l1' }],
         [{
           listing_id: 'l1', buyer_id: 'b1', seller_id: 's1',
-          offer_status: 'pending', listing_status: 'active', last_actor: 'buyer',
+          status: 'pending', listing_status: 'active', last_actor: 'buyer',
         }],
         [[], 0],
       ]);
