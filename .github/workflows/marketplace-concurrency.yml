@@ -29,12 +29,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          password="$(openssl rand -hex 24)"
-          echo "::add-mask::$password"
+          # This container is job-local, disposable, and published only on loopback.
+          # Trust auth avoids storing or inventing a credential for a one-job test DB.
           docker run -d --name nexus-d5-ci-postgres --rm \
             -e POSTGRES_USER=nexus_test \
             -e POSTGRES_DB=nexus_test \
-            -e POSTGRES_PASSWORD="$password" \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
             -p 127.0.0.1:55440:5432 postgres:17 >/dev/null
           for attempt in $(seq 1 45); do
             if docker exec nexus-d5-ci-postgres pg_isready -U nexus_test -d nexus_test >/dev/null 2>&1; then break; fi
@@ -51,7 +51,6 @@ jobs:
             echo 'NEXUS_D3_PORT=55440'
             echo 'NEXUS_D3_DB=nexus_test'
             echo 'NEXUS_D3_USER=nexus_test'
-            echo "PGPASSWORD=$password"
           } >> "$GITHUB_ENV"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
