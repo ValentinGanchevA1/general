@@ -18,6 +18,8 @@ import { resetInboxSeen } from '@/features/interactions/inboxSeen';
 import { unregisterPushToken } from '@/lib/pushNotifications';
 import { disconnectSocket } from '@/realtime/useSocket';
 import { extractMessage } from '@/utils/extractMessage';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
+import { markWorldSelectionPending } from '@/features/worldModes/worldModeStorage';
 
 interface AuthState {
   user: AuthenticatedUser | null;
@@ -68,6 +70,13 @@ export const register = createAsyncThunk(
       const res = await postJson<typeof args, LoginResponse>('/auth/register', args);
       await tokenStore.set(res.tokens);
       Sentry.setUser({ id: res.user.id });
+      if (WORLD_MODES_ENABLED) {
+        try {
+          await markWorldSelectionPending(res.user.id);
+        } catch {
+          // Fail open to the current NEXUS experience if local preference storage is unavailable.
+        }
+      }
       return res.user;
     } catch (e: unknown) {
       return rejectWithValue(extractMessage(e, 'Registration failed'));
