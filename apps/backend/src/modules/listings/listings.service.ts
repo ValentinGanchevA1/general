@@ -32,6 +32,13 @@ import { S3Service } from '../../common/s3.service';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const OFFER_PREVIEW = 50;
+const LISTING_VIEWER_ACCESS_PREDICATE = `
+  AND (l.visibility = 'public' OR l.seller_id = $1)
+  AND NOT EXISTS (
+        SELECT 1 FROM user_blocks ub
+         WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
+            OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
+      )`;
 
 interface ListingRow {
   id: string;
@@ -219,12 +226,7 @@ export class ListingsService {
         WHERE l.deleted_at IS NULL
           AND l.status = 'active'
           AND (l.expires_at IS NULL OR l.expires_at > NOW())
-          AND (l.visibility = 'public' OR l.seller_id = $1)
-          AND NOT EXISTS (
-                SELECT 1 FROM user_blocks ub
-                 WHERE (ub.blocker_id = $1 AND ub.blocked_id = l.seller_id)
-                    OR (ub.blocker_id = l.seller_id AND ub.blocked_id = $1)
-              )
+          ${LISTING_VIEWER_ACCESS_PREDICATE}
           AND ($5::text IS NULL OR l.category = $5)
           AND ($7::text IS NULL OR l.mode = $7)
           AND ST_DWithin(
