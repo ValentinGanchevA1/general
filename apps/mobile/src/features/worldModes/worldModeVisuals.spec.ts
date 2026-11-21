@@ -16,7 +16,7 @@ function sample(overrides: Partial<WorldModeVisualInput> = {}): WorldModeVisualI
 }
 
 describe('World Mode decorative visuals', () => {
-  it('applies the selected palette for the hydrated account', () => {
+  it('applies the selected palette for the hydrated account in dark appearance', () => {
     const visuals = resolveWorldModeVisuals(sample());
     expect(visuals.id).toBe('sanctuary');
     expect(visuals.accent).toBe('#8CE8C4');
@@ -28,14 +28,22 @@ describe('World Mode decorative visuals', () => {
     ['signed out', { userId: null }],
     ['different account', { userId: 'user-b' }],
     ['not hydrated', { hydrated: false }],
-    ['light appearance', { scheme: 'light', colors: lightColors }],
-  ] as const)('falls back to semantic colors for %s', (_label, patch) => {
+  ] as const)('hides the selected identity and falls back for %s', (_label, patch) => {
     const input = sample(patch);
     const visuals = resolveWorldModeVisuals(input);
     expect(visuals.active).toBe(false);
     expect(visuals.id).toBeNull();
     expect(visuals.accent).toBe(input.colors.actionPrimary);
     expect(visuals.glow).toBe(input.colors.actionGhost);
+  });
+
+  it('keeps the World identity visible in Light appearance without applying its palette', () => {
+    const input = sample({ scheme: 'light', colors: lightColors });
+    const visuals = resolveWorldModeVisuals(input);
+    expect(visuals.active).toBe(false);
+    expect(visuals.id).toBe('sanctuary');
+    expect(visuals.accent).toBe(lightColors.actionPrimary);
+    expect(visuals.glow).toBe(lightColors.actionGhost);
   });
 
   it('exposes decorative tokens only, never trust or status overrides', () => {
