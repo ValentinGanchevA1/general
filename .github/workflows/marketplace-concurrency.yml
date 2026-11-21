@@ -60,7 +60,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @g88/backend exec jest --ci --runInBand \
+          pnpm --filter @g88/backend exec jest --ci --runInBand --coverage \
+            --coverageReporters=lcov --coverageDirectory=coverage \
             --runTestsByPath src/modules/listings/listings-concurrency.integration.spec.ts \
             --json --outputFile="$RUNNER_TEMP/marketplace-d5-results.json"
           node - "$RUNNER_TEMP/marketplace-d5-results.json" <<'NODE'
