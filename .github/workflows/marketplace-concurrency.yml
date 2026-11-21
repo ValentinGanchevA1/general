@@ -72,6 +72,12 @@ jobs:
             throw new Error('D5 fail-closed: exactly nine passing, zero skipped tests required');
           }
           console.log('D5 concurrency gate: 9 passed, 0 skipped');
+          const lcov = fs.readFileSync('apps/backend/coverage/lcov.info', 'utf8');
+          const target = lcov.split('end_of_record').find(record => record.includes('SF:src/modules/listings/listings.service.ts'));
+          if (!target || !/^LF:\\d+/m.test(target) || !/^LH:\\d+/m.test(target)) {
+            throw new Error('D5 fail-closed: LCOV must include listings.service.ts line metrics');
+          }
+          console.log('D5 LCOV gate: listings.service.ts included');
           NODE
       - name: Stop disposable PostgreSQL
         if: always()
