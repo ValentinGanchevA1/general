@@ -5,6 +5,7 @@ import type { WorldModeId } from './worldModes';
 
 export interface WorldModeVisuals {
   readonly active: boolean;
+  /** Selected World is available for labels/chips even when its accent treatment is disabled. */
   readonly id: WorldModeId | null;
   readonly accent: string;
   readonly glow: string;
@@ -21,14 +22,14 @@ export interface WorldModeVisualInput {
 }
 
 /**
- * Decorative-only World accents. Require a hydrated owner match so a previous
- * account's preference can never flash while the next session is initializing.
- * Light appearance intentionally falls back until each palette is contrast-tested.
+ * Decorative World accent resolver. Never changes semantic status, trust or
+ * entitlement tokens. The selected identity is retained in Light appearance,
+ * but all color treatment falls back to the current theme until contrast QA.
+ * Account ownership is checked before exposing the selected ID.
  */
 export function resolveWorldModeVisuals(input: WorldModeVisualInput): WorldModeVisuals {
   if (
     !input.enabled ||
-    input.scheme !== 'dark' ||
     !input.hydrated ||
     !input.userId ||
     input.ownerId !== input.userId
@@ -36,6 +37,15 @@ export function resolveWorldModeVisuals(input: WorldModeVisualInput): WorldModeV
     return {
       active: false,
       id: null,
+      accent: input.colors.actionPrimary,
+      glow: input.colors.actionGhost,
+    };
+  }
+
+  if (input.scheme === 'light') {
+    return {
+      active: false,
+      id: input.id,
       accent: input.colors.actionPrimary,
       glow: input.colors.actionGhost,
     };
