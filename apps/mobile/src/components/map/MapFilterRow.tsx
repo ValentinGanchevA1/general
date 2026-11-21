@@ -99,6 +99,7 @@ export function MapFilterRow({
 }: MapFilterRowProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const { colors, shadow } = useAppTheme();
+	const worldVisuals = useWorldModeVisuals();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
