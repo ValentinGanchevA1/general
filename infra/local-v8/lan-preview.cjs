@@ -3,7 +3,7 @@
 // select a destination. This is a test proxy, not a public reverse proxy.
 const https = require('node:https');
 const http = require('node:http');
-const { readFileSync, createReadStream, statSync, existsSync, realpathSync } = require('node:fs');
+const { readFileSync, createReadStream, statSync, existsSync, realpathSync, readdirSync } = require('node:fs');
 const { resolve, join, extname, sep } = require('node:path');
 const { isIP } = require('node:net');
 
@@ -18,6 +18,36 @@ const MIME = {
 };
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const ROOT_REAL = existsSync(ROOT) ? realpathSync(ROOT) : ROOT;
+const STATIC_FILES = new Map();
+
+function registerStaticFile(route, candidate) {
+  try {
+    const real = realpathSync(candidate);
+    if ((real !== ROOT_REAL && !real.startsWith(ROOT_REAL + sep)) || !statSync(real).isFile()) return;
+    STATIC_FILES.set(route, real);
+  } catch { /* Build output may be incomplete before the web build. */ }
+}
+
+function scanDistAssets(directory, routePrefix) {
+  if (!existsSync(directory)) return;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!/^[A-Za-z0-9_.-]+$/.test(entry.name) || entry.name.startsWith('.')) continue;
+    const candidate = join(directory, entry.name);
+    const route = routePrefix + '/' + entry.name;
+    if (entry.isDirectory()) {
+      scanDistAssets(candidate, route);
+    } else if (entry.isFile() && /\.(?:js|css|mjs|map)$/i.test(entry.name)) {
+      registerStaticFile(route, candidate);
+    }
+  }
+}
+
+for (const name of ['index.html', 'styles.css', 'map.css', 'connections.css']) {
+  registerStaticFile(name === 'index.html' ? '/' : '/' + name, join(ROOT, name));
+  registerStaticFile('/' + name, join(ROOT, name));
+}
+scanDistAssets(join(ROOT, 'dist'), '/dist');
+
 
 function assertLanAddress(address) {
   if (isIP(address) !== 4 || !(/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(address))) {
@@ -71,17 +101,8 @@ function isAllowedHost(headers, address) {
 function staticPath(raw) {
   const target = parseRequestTarget(raw);
   if (!target) return null;
-  const pathname = target.decodedPath;
-  const full = resolve(ROOT, '.' + pathname);
-  if (full !== ROOT && !full.startsWith(ROOT + sep)) return null;
-  const candidate = full === ROOT ? join(ROOT, 'index.html') : full;
-  const relative = candidate.slice(ROOT.length + 1).replaceAll('\\', '/');
-  if (!/^(index\.html|(?:styles|map|connections)\.css|dist\/[a-zA-Z0-9._/-]+\.(?:js|css|mjs|map))$/.test(relative)) return null;
-  try {
-    const real = realpathSync(candidate);
-    if (real !== ROOT_REAL && !real.startsWith(ROOT_REAL + sep)) return null;
-    return statSync(real).isFile() ? real : null;
-  } catch { return null; }
+  const route = target.decodedPath === '/' ? '/' : target.decodedPath;
+  return STATIC_FILES.get(route) ?? null;
 }
 
 function proxyHeaders(headers) {
