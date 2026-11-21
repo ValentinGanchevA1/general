@@ -6,6 +6,7 @@ Current implementation: [PR #1147](https://github.com/ValentinGanchevA1/general/
 
 - `WORLD_MODES_ENABLED = __DEV__`. Production APK/AAB keeps the selector and decorative World accents disabled.
 - World selection is a local, account-scoped preference. It does not grant trust, identity verification, subscription entitlement, visibility or access.
+- Early-version scope is disclosed in the selector: decorative accents and portal entry only; no ranking, visibility, permissions or access changes.
 - World accents are dark-appearance-only until every palette is separately contrast-validated for light appearance.
 - Keep semantic discovery/action, trust, verification, privacy, danger, success and premium colors unchanged.
 - Do not capture or commit screenshots with real precise locations, private avatars, identifiers or tokens.
@@ -20,6 +21,7 @@ Current implementation: [PR #1147](https://github.com/ValentinGanchevA1/general/
 | ONB-04 | Activate Sanctuary | Preference is written before the marker is removed; WorldSelection remains mounted through the Sanctuary portal, then Main replaces it |
 | ONB-05 | Skip World Selection | NEXUS is selected; route remains mounted through its portal; Main replaces it afterwards |
 | ONB-06 | Simulate AsyncStorage write failure during selection | No false saved state; user can continue with NEXUS for this session |
+| ONB-06A | Simulate marker cleanup failure after World preference write | Selection succeeds in-session; marker remains and safely reoffers selector on later launch |
 | ONB-07 | Sign into an existing account with no first-run marker | Goes directly to Main; no forced onboarding |
 | ONB-08 | Two accounts on one device | Account B never sees account A's in-memory or persisted mode |
 | ONB-09 | Force-close and relaunch after activation | Correct account's stored World is restored before decorative accents are applied |
@@ -45,6 +47,7 @@ Current implementation: [PR #1147](https://github.com/ValentinGanchevA1/general/
 - TalkBack/VoiceOver announces World card name, subtitle, selected/active state and activation/skip actions.
 - After activation or Skip, the portal label matches the persisted World; the route to Main occurs once only after the transition.
 - With Reduce Motion enabled, the portal expansion is skipped and navigation continues immediately; no splash/launch timing token is changed.
+- Portal motion preference lookup defaults to reduced motion on timeout/error and does not alter cold-start motion telemetry.
 - Text scaling does not clip the 2-column selector or footer actions.
 - Touch targets remain at least 44 dp/pt.
 - Reduce Motion leaves selection fully usable; decorative World accents do not require motion.
