@@ -2,21 +2,18 @@
 // HTTPS-only opt-in LAN preview. Upstream is pinned to loopback; requests never
 // select a destination. This is a test proxy, not a public reverse proxy.
 const https = require('node:https');
-const http = require('node:http');
 const { readFileSync, createReadStream, statSync, existsSync, realpathSync, readdirSync } = require('node:fs');
 const { resolve, join, extname, sep } = require('node:path');
 const { isIP } = require('node:net');
 
 const ROOT = resolve(__dirname, '..', '..', 'web');
-const API = '127.0.0.1';
-const API_PORT = 33188;
 const PORT = 4176;
 const MIME = {
   '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.js':'text/javascript; charset=utf-8', '.map':'application/json; charset=utf-8',
   '.svg':'image/svg+xml',
 };
-const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+const METHODS = new Set(['GET', 'HEAD']);
 const ROOT_REAL = existsSync(ROOT) ? realpathSync(ROOT) : ROOT;
 const STATIC_FILES = new Map();
 
@@ -105,34 +102,6 @@ function staticPath(raw) {
   return STATIC_FILES.get(route) ?? null;
 }
 
-function proxyHeaders(headers) {
-  const allowed = [
-    'accept', 'accept-encoding', 'accept-language', 'content-type', 'content-length',
-    'authorization', 'cookie', 'user-agent', 'x-nexa-web-session', 'x-csrf-token',
-  ];
-  const result = {};
-  for (const name of allowed) {
-    const value = headers[name];
-    if (typeof value === 'string') result[name] = value;
-  }
-  result.host = API + ':' + API_PORT;
-  result.origin = 'http://127.0.0.1:' + API_PORT;
-  return result;
-}
-
-function safeResponseHeaders(headers) {
-  const blocked = new Set([
-    'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
-    'te', 'trailer', 'transfer-encoding', 'upgrade', 'location',
-    'access-control-allow-origin', 'access-control-allow-credentials',
-  ]);
-  const result = {};
-  for (const [name, value] of Object.entries(headers)) {
-    if (!blocked.has(name.toLowerCase()) && value !== undefined) result[name] = value;
-  }
-  return result;
-}
-
 function start({ address, cert, key }) {
   assertLanAddress(address);
   if (!cert || !key) throw Error('TLS certificate and key are required');
@@ -149,28 +118,9 @@ function start({ address, cert, key }) {
     const target = parseRequestTarget(req.url || '');
     if (!target) { res.writeHead(400).end('Invalid request target'); return; }
 
-    if (isApi(target.decodedPath)) {
-      const upstream = http.request({
-        hostname: API, port: API_PORT,
-        path: target.pathname + target.search,
-        method: req.method,
-        headers: proxyHeaders(req.headers),
-        timeout: 15000,
-      }, (response) => {
-        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400) {
-          response.resume();
-          res.writeHead(502).end('Local API redirect refused');
-          return;
-        }
-        res.writeHead(response.statusCode || 502, safeResponseHeaders(response.headers));
-        response.pipe(res);
-      });
-      upstream.on('timeout', () => upstream.destroy(new Error('Local API timeout')));
-      upstream.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end('Local API unavailable'); });
-      res.on('close', () => upstream.destroy());
-      req.pipe(upstream);
-      return;
-    }
+    // Static-only LAN preview: API and Socket.IO are denied until a separately
+    // reviewed, route-specific local proxy is designed and tested.
+    if (isApi(target.decodedPath)) { res.writeHead(403).end('Backend access disabled in LAN preview'); return; }
 
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405).end(); return; }
     const file = staticPath(req.url || '/');
@@ -184,52 +134,8 @@ function start({ address, cert, key }) {
     stream.pipe(res);
   });
 
-  server.on('upgrade', (req, socket, head) => {
-    const target = parseRequestTarget(req.url || '');
-    const connection = String(req.headers.connection || '').toLowerCase().split(',').map((v) => v.trim());
-    if (!isAllowedHost(req.headers, address) || !target ||
-        !target.decodedPath.startsWith('/socket.io') ||
-        (target.decodedPath !== '/socket.io' && !target.decodedPath.startsWith('/socket.io/')) ||
-        req.method !== 'GET' || String(req.headers.upgrade || '').toLowerCase() !== 'websocket' ||
-        !connection.includes('upgrade')) {
-      socket.destroy();
-      return;
-    }
-
-    const headers = proxyHeaders(req.headers);
-    for (const name of ['connection', 'upgrade', 'sec-websocket-key', 'sec-websocket-version',
-      'sec-websocket-protocol', 'sec-websocket-extensions']) {
-      const value = req.headers[name];
-      if (typeof value === 'string') headers[name] = value;
-    }
-    headers.connection = 'Upgrade';
-    headers.upgrade = 'websocket';
-
-    const upstream = http.request({
-      hostname: API, port: API_PORT, path: target.pathname + target.search,
-      method: 'GET', headers, timeout: 15000,
-    });
-    upstream.on('upgrade', (response, upstreamSocket, upstreamHead) => {
-      const lines = ['HTTP/1.1 101 Switching Protocols'];
-      for (const [name, value] of Object.entries(response.headers)) {
-        const values = Array.isArray(value) ? value : [value];
-        for (const entry of values) {
-          if (typeof entry === 'string' && !/[\r\n]/.test(name + entry)) lines.push(name + ': ' + entry);
-        }
-      }
-      socket.write(lines.join('\r\n') + '\r\n\r\n');
-      if (upstreamHead.length) socket.write(upstreamHead);
-      if (head.length) upstreamSocket.write(head);
-      socket.pipe(upstreamSocket).pipe(socket);
-      upstreamSocket.on('error', () => socket.destroy());
-      socket.on('error', () => upstreamSocket.destroy());
-    });
-    upstream.on('response', () => socket.destroy());
-    upstream.on('timeout', () => upstream.destroy());
-    upstream.on('error', () => socket.destroy());
-    socket.on('close', () => upstream.destroy());
-    upstream.end();
-  });
+  // No WebSocket upgrades are accepted by the static-only LAN preview.
+  server.on('upgrade', (_req, socket) => socket.destroy());
 
   server.listen(PORT, address, () =>
     process.stdout.write('NEXUS HTTPS LAN preview ready on https://' + address + ':' + PORT + '\n'));
@@ -243,5 +149,5 @@ if (require.main === module) {
 
 module.exports = {
   assertLanAddress, parseRequestTarget, isApi, isAllowedHost, staticPath,
-  proxyHeaders, safeResponseHeaders, start,
+  start,
 };
