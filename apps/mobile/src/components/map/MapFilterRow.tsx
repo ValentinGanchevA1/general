@@ -26,6 +26,7 @@ import { savedPlacesMapLayerStore } from '@/features/places/savedPlacesMapLayer.
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
+import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
@@ -180,7 +181,7 @@ export function MapFilterRow({
 				<View style={[
 					styles.searchShell,
 					shadow(0.12),
-					{ borderColor: searchFocused ? colors.discovery : colors.borderStrong },
+					{ borderColor: searchFocused ? colors.discovery : worldVisuals.active ? worldVisuals.accent : colors.borderStrong },
 				]}>
 					<Icon name="magnify" size={20} color={searchFocused ? colors.discovery : colors.textTertiary} />
 					<TextInput
@@ -211,7 +212,7 @@ export function MapFilterRow({
 
 				<Pressable
 					onPress={recenterMap}
-					style={({ pressed }) => [styles.locateButton, shadow(0.1), pressed && styles.pressed]}
+					style={({ pressed }) => [styles.locateButton, shadow(0.1), worldVisuals.active ? { borderColor: worldVisuals.accent } : undefined, pressed && styles.pressed]}
 					accessibilityRole="button"
 					accessibilityLabel="Center map on my location"
 				>
