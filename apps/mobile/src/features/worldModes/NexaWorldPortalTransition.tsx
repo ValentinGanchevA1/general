@@ -1,11 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, StatusBar, StyleSheet, Text, View } from 'react-native';
 
-import { resolveLaunchReduceMotion } from '@/components/Brand/resolveLaunchReduceMotion';
 import { nexaDark } from '@/theme';
 
 import { WORLD_MODES, type WorldModeId } from './worldModes';
 import { worldModePalettes } from '@/theme/worldModePalettes';
+
+const PORTAL_MOTION_PREFERENCE_TIMEOUT_MS = 250;
+
+/** Portal-specific motion lookup: fail safe to reduced motion and do not alter cold-start telemetry. */
+function resolvePortalReduceMotion(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (enabled: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(enabled);
+    };
+    const timeoutId = setTimeout(() => finish(true), PORTAL_MOTION_PREFERENCE_TIMEOUT_MS);
+    void AccessibilityInfo.isReduceMotionEnabled().then(finish).catch(() => finish(true));
+  });
+}
 
 export interface NexaWorldPortalTransitionProps {
   worldId: WorldModeId;
@@ -29,7 +45,7 @@ export function NexaWorldPortalTransition({
     let cancelled = false;
     let animation: Animated.CompositeAnimation | null = null;
 
-    void resolveLaunchReduceMotion().then((reduceMotion) => {
+    void resolvePortalReduceMotion().then((reduceMotion) => {
       if (cancelled) return;
       if (reduceMotion) {
         onComplete();
