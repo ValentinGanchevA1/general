@@ -36,5 +36,12 @@ export async function persistFirstRunWorldSelection(
   mode: WorldModeId,
 ): Promise<void> {
   await writeWorldMode(userId, mode);
-  await AsyncStorage.removeItem(keyForUser(FIRST_RUN_PREFIX, userId));
+  // Marker cleanup is best-effort: the preference is already persisted. If cleanup
+  // fails, the next launch safely offers the selector again instead of reverting
+  // the in-memory choice to NEXUS or trapping the user on a storage error.
+  try {
+    await AsyncStorage.removeItem(keyForUser(FIRST_RUN_PREFIX, userId));
+  } catch {
+    // Keep the marker for a later retry.
+  }
 }
