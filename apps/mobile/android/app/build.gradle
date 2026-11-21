@@ -175,3 +175,50 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Release gate: inspect AGP's merged manifest, not only the source manifest.
+// Fails closed if AGP changes the merged-manifest output layout.
+tasks.register("checkReleaseMediaPermissions") {
+    dependsOn("processReleaseMainManifest")
+    doLast {
+        def roots = [
+            file("$buildDir/intermediates/merged_manifests/release"),
+            file("$buildDir/intermediates/merged_manifest/release")
+        ]
+        def manifests = roots.findAll { it.exists() }.collectMany { root ->
+            fileTree(root).matching { include "**/AndroidManifest.xml" }.files
+        }
+        if (manifests.isEmpty()) {
+            throw new GradleException("Release merged AndroidManifest.xml not found; refusing to build AAB.")
+        }
+        def forbidden = [
+            "android.permission.READ_MEDIA_IMAGES",
+            "android.permission.READ_MEDIA_VIDEO"
+        ]
+        manifests.each { manifest ->
+            def factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            factory.setNamespaceAware(true)
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            def doc = factory.newDocumentBuilder().parse(manifest)
+            def permissions = []
+            ["uses-permission", "uses-permission-sdk-23", "uses-permission-sdk-m"].each { tag ->
+                def nodes = doc.getElementsByTagName(tag)
+                for (int i = 0; i < nodes.length; i++) {
+                    permissions.add(nodes.item(i).getAttributeNS("http://schemas.android.com/apk/res/android", "name"))
+                }
+            }
+            def found = forbidden.intersect(permissions)
+            if (!found.isEmpty()) {
+                throw new GradleException("Forbidden broad media permissions in merged release manifest: ${found}")
+            }
+        }
+        logger.lifecycle("Release merged manifest media permission gate passed.")
+    }
+}
+
+// Android Gradle Plugin creates variant bundle tasks after project evaluation.
+// configureEach also covers tasks registered later without failing early.
+tasks.matching { it.name == "bundleRelease" }.configureEach {
+    dependsOn("checkReleaseMediaPermissions")
+}
+
