@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { publicPlaceTrendingStore } from '@/features/places/publicPlaceTrending.store';
 import { savedPlaceMapFocusStore } from '@/features/places/savedPlaceMapFocus.store';
 import { fontSize, useAppTheme, type ThemeColors } from '@/theme';
+import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 
 import {
 	MAP_CHROME_GAP,
@@ -83,7 +84,7 @@ export function TrendingCard({ items, onPressItem, top, visible, collapsed = tru
 
 	return (
 		<View style={[styles.wrap, { top }]} pointerEvents="box-none">
-			<View style={[styles.card, shadow(0.12)]}>
+			<View style={[styles.card, shadow(0.12), worldVisuals.active ? { borderColor: worldVisuals.accent } : undefined]}>
 				<Pressable
 					onPress={canToggle ? onToggleCollapse : undefined}
 					style={({ pressed }) => [styles.headerBlock, pressed && canToggle && styles.pressed]}
