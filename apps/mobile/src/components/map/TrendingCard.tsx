@@ -52,6 +52,7 @@ function formatSummary(summary: TrendingSummary | undefined): string | null {
 
 export function TrendingCard({ items, onPressItem, top, visible, collapsed = true, onToggleCollapse, summary }: TrendingCardProps): React.JSX.Element | null {
 	const { colors, shadow } = useAppTheme();
+	const worldVisuals = useWorldModeVisuals();
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const summaryLine = useMemo(() => formatSummary(summary), [summary]);
 	const publicPlaces = useSyncExternalStore(
