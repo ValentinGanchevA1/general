@@ -28,6 +28,10 @@ import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { PhotosScreen } from '@/screens/PhotosScreen';
 import { ChatScreen } from '@/screens/ChatScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { WorldModesScreen } from '@/features/worldModes/WorldModesScreen';
+import { WorldSelectionScreen } from '@/features/worldModes/WorldSelectionScreen';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
+import { clearWorldMode, hydrateWorldMode } from '@/features/worldModes/worldModesSlice';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
@@ -87,6 +91,7 @@ export type TabParamList = {
 export type RootStackParamList = {
 	Auth: undefined;
 	ProfileCreation: undefined;
+	WorldSelection: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
 	Chat: { conversationId: string; otherUserName: string; requestPending?: boolean; otherUserId?: string; otherUserVerification?: VerificationLevel; otherUserIdVerified?: boolean };
 	UserProfile: { userId: string; focus?: 'trust' | 'stats' | 'storyline' | 'photos' | 'bio' | 'mutual' };
@@ -129,6 +134,7 @@ function AccountNavigator(): React.JSX.Element {
 	const screenOptions = useStackScreenOptions();
 	return <AccountStack.Navigator screenOptions={screenOptions}>
 		<AccountStack.Screen name="Settings" component={SettingsScreen} />
+		<AccountStack.Screen name="WorldModes" component={WorldModesScreen} options={{ headerShown: false }} />
 		<AccountStack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ headerShown: false, title: 'Trust' }} />
 		<AccountStack.Screen name="Privacy" component={PrivacyScreen} /><AccountStack.Screen name="Help" component={HelpScreen} /><AccountStack.Screen name="About" component={AboutScreen} /><AccountStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} /><AccountStack.Screen name="BlockedUsers" component={BlockedUsersScreen} /><AccountStack.Screen name="Verification" component={VerificationScreen} />
 		<AccountStack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Verify email', presentation: 'modal' }} />
@@ -357,6 +363,7 @@ export function AppNavigator(): React.JSX.Element {
 	const userId = user?.id ?? null;
 	const restoring = useAppSelector((s) => s.auth.restoring);
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
+	const worldModes = useAppSelector((s) => s.worldModes);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
 	const [navigationReady, setNavigationReady] = useState(false);
@@ -368,6 +375,9 @@ export function AppNavigator(): React.JSX.Element {
 	const navigationTheme = useMemo(() => buildNavigationTheme(themeColors, scheme === 'dark'), [themeColors, scheme]);
 
 	useEffect(() => { void dispatch(restoreSession()); }, [dispatch]);
+	useEffect(() => {
+		if (userId && WORLD_MODES_ENABLED) void dispatch(hydrateWorldMode(userId));
+	}, [dispatch, userId]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
@@ -390,9 +400,13 @@ export function AppNavigator(): React.JSX.Element {
 	useEffect(() => { if (!launchInteractionsReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } if (!userId) prevUserRef.current = null; }, [launchInteractionsReady, userId]);
 	useEffect(() => { if (!launchInteractionsReady || !userId || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, restoring]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
+	const worldModeHydratedForUser = userId != null && worldModes.ownerId === userId && worldModes.hydrated;
+	if (userId && profileSetupComplete && WORLD_MODES_ENABLED && !worldModeHydratedForUser) {
+		return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading your NEXUS preferences" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
+	}
 	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
-			{user ? <>{!profileSetupComplete && <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} />}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
+			{user ? <>{!profileSetupComplete ? <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} /> : null}{profileSetupComplete && WORLD_MODES_ENABLED && worldModes.firstRunPending ? <Stack.Screen name="WorldSelection" component={WorldSelectionScreen} /> : null}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="Auth" component={AuthScreen} />}
 		</Stack.Navigator>{user ? <AmbientToastHost /> : null}<AppAlertHost />
 	</BottomSheetModalProvider></NavigationContainer>;
 }
