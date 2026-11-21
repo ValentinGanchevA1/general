@@ -42,6 +42,12 @@ describe('World Mode storage', () => {
     expect(storage.removeItem).toHaveBeenCalledWith('g88:world-mode-first-run:v1:user-a');
   });
 
+  it('continues when marker cleanup fails after the mode has been saved', async () => {
+    storage.removeItem.mockRejectedValueOnce(new Error('cleanup unavailable'));
+    await expect(persistFirstRunWorldSelection('user-a', 'nocturne')).resolves.toBeUndefined();
+    expect(storage.setItem).toHaveBeenCalledWith('g88:world-mode:v1:user-a', 'nocturne');
+  });
+
   it('does not clear the first-run marker when saving the mode fails', async () => {
     storage.setItem.mockRejectedValueOnce(new Error('storage unavailable'));
     await expect(persistFirstRunWorldSelection('user-a', 'bazaar')).rejects.toThrow();
