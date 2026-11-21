@@ -31,7 +31,7 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { WorldModesScreen } from '@/features/worldModes/WorldModesScreen';
 import { WorldSelectionScreen } from '@/features/worldModes/WorldSelectionScreen';
 import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
-import { clearWorldMode, hydrateWorldMode } from '@/features/worldModes/worldModesSlice';
+import { hydrateWorldMode } from '@/features/worldModes/worldModesSlice';
 import { AlertComposerScreen } from '@/screens/AlertComposerScreen';
 import { VerificationScreen } from '@/screens/VerificationScreen';
 import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
