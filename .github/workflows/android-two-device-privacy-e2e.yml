@@ -113,7 +113,7 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/index.android.bundle'
           unzip -Z1 "$APK" | grep -q '^lib/x86_64/.*\.so$'
 
-      - name: Provision isolated production test accounts
+      - name: Provision isolated QA test accounts
         run: node scripts/android-two-device-privacy-setup.mjs prepare
 
       - name: Install Android 12 emulator image
