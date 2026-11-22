@@ -52,6 +52,7 @@ Optional:
 ## Trigger behavior
 - The branch has a push trigger restricted to `feat/worlds-qa-apk-master-clean-20261122` and only the workflow/config files.
 - The job is skipped unless the repository Actions variable `NEXUS_WORLDS_QA_API_HOST` is configured. Set it to a verified non-production bare hostname only after staging is ready.
+- The two-device realtime privacy E2E is gated by the same variable, builds the isolated `com.g88.qa` package, and uses only QA Maps/Firebase credentials. It is skipped while the QA host is unset; it must never register synthetic users or messages against the Production API.
 - GitHub `workflow_dispatch` is also declared, but GitHub only exposes manual dispatch after the workflow file exists on the default branch. Until then, use the gated branch push path. See [GitHub's workflow event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
 
 ## Run — only after all infrastructure gates pass
