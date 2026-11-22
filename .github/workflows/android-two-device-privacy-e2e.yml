@@ -25,12 +25,14 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   DEVICE_E2E_STATE_FILE: .tmp/android-two-device-privacy.json
-  DEVICE_E2E_BASE_URL: https://g88-api.onrender.com
+  # Destructive E2E account/message setup is permitted only on a separate QA API.
+  DEVICE_E2E_BASE_URL: https://${{ vars.NEXUS_WORLDS_QA_API_HOST || '' }}
   ANDROID_AVD_HOME: ${{ github.workspace }}/.tmp/android-avd
 
 jobs:
   android-two-device-privacy:
     name: live location block + reconnect on two AVDs
+    if: ${{ vars.NEXUS_WORLDS_QA_API_HOST != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 55
 
@@ -65,44 +67,46 @@ jobs:
             fi
           done <<< "$CANDIDATES"
 
-      - name: Inject Android build configuration
+      - name: Validate isolated QA target and credentials
         working-directory: apps/mobile
         env:
-          GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
-          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          API_HOST: ${{ vars.NEXUS_WORLDS_QA_API_HOST }}
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
         run: |
+          set -euo pipefail
+          node -e 'const h=(process.env.API_HOST||"").trim().toLowerCase(); const blocked=["g88-api.onrender.com","api.g88.app","g88.app","www.g88.app","localhost","127.0.0.1","10.0.2.2"]; const labels=h.split("."); const ip=labels.length===4 && labels.every(x=>/^\\d+$/.test(x)); if(!h || h.includes("://") || h.includes("/") || h.includes(":") || h.includes(" ") || blocked.includes(h) || h.endsWith(".g88.app") || ip || labels.length<2 || labels.some(x=>!x || x.length>63 || x.startsWith("-") || x.endsWith("-")) || !/^[a-z0-9.-]+$/.test(h)) { console.error("Rejected QA API host; provide a verified non-production bare DNS hostname."); process.exit(1); }'
+          test -n "$GOOGLE_MAPS_API_KEY_QA" || { echo "::error::GOOGLE_MAPS_API_KEY_QA is required"; exit 1; }
+          test -n "$GOOGLE_SERVICES_JSON_QA" || { echo "::error::GOOGLE_SERVICES_JSON_QA is required"; exit 1; }
+          echo "Dedicated QA API host and provider credentials validated."
+
+      - name: Inject Android QA build configuration
+        working-directory: apps/mobile
+        env:
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
+        run: |
+          set -euo pipefail
           cat >> android/local.properties <<EOF
-          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_DEBUG}
-          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_RELEASE}
+          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_QA}
+          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_QA}
           EOF
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
-          else
-            cat > android/app/google-services.json <<'JSON'
-          {
-            "project_info": { "project_number": "0", "project_id": "g88-ci-placeholder" },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:0:android:0",
-                "android_client_info": { "package_name": "com.g88" }
-              },
-              "api_key": [{ "current_key": "placeholder" }]
-            }]
-          }
-          JSON
-          fi
+          echo "$GOOGLE_SERVICES_JSON_QA" | base64 -d > android/app/google-services.json
+          node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync("android/app/google-services.json","utf8")); if(!(j.client||[]).some(c=>c.client_info?.android_client_info?.package_name==="com.g88.qa")) { console.error("QA Firebase config must contain package com.g88.qa"); process.exit(1); }'
 
       - name: Build probe-enabled x86_64 release APK
         working-directory: apps/mobile/android
         env:
-          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
+          API_HOST: ${{ vars.NEXUS_WORLDS_QA_API_HOST }}
+          NEXUS_WORLDS_QA: '1'
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID_QA || '' }}
           NEXA_E2E_DEVICE_PROBE: '1'
           SENTRY_DSN: ''
         run: |
           ./gradlew assembleRelease --no-daemon \
             --init-script ci-init.gradle \
             -PversionCodeOverride=${{ github.run_number }} \
+            -PnexusWorldsQaApplicationId=true \
             -PreactNativeArchitectures=x86_64
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
@@ -250,5 +254,5 @@ jobs:
         if: always()
         run: |
           if [ -f "$DEVICE_E2E_STATE_FILE" ]; then
-            node scripts/android-two-device-privacy-setup.mjs cleanup || true
+            node scripts/android-two-device-privacy-setup.mjs cleanup
           fi
