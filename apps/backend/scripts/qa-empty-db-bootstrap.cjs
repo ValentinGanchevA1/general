@@ -106,6 +106,7 @@ async function main() {
         sourceMigrationFileCount: expected.length,
         appliedMigrationCount: actual.length,
         migrationNamesMatch: true,
+        requiredCoreSchemaObjects: true,
         requiredExtensionsPresent: true,
         disposableTargetOnly: true,
       }, null, 2) + '\n');
