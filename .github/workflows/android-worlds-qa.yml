@@ -283,11 +283,11 @@ jobs:
           "$APKSIGNER" verify --verbose "$APK"
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
           SHA256_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-256 digest:' || true)"
-          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           KEY_SHA256="$(keytool -exportcert -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
           KEY_CERT_DETAILS="$(LC_ALL=C keytool -list -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null)"
           KEY_SHA1_LINE="$(printf '%s\n' "$KEY_CERT_DETAILS" | grep -i -m1 '^[[:space:]]*SHA1:' || true)"
-          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           if [ "${#APK_SHA256}" -ne 64 ] || [[ "$APK_SHA256" == *[!0-9a-f]* ]]; then
             echo "::error::Could not extract a valid SHA-256 certificate digest from apksigner output."
             printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-256 digest' || true
