@@ -50,7 +50,7 @@ jobs:
           ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          node -e 'const h=process.env.API_HOST.trim(); if(!h || h.includes("api.g88.app") || h.includes("localhost") || h.includes("127.0.0.1")) { console.error("Rejected API_HOST: provide a reachable non-production QA host."); process.exit(1); }'
+          node -e 'const h=process.env.API_HOST.trim(); const forbidden=["api.g88.app","g88-api.onrender.com","localhost","127.0.0.1","10.0.2.2"]; if(!h || h.includes("://") || h.includes("/") || h.includes(" ") || forbidden.some(x=>h.toLowerCase().includes(x)) || !/^[a-z0-9.-]+$/i.test(h)) { console.error("Rejected API_HOST: provide a bare, reachable non-production hostname (no scheme/path)."); process.exit(1); }'
           for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_DEBUG GOOGLE_MAPS_API_KEY_RELEASE GOOGLE_SERVICES_JSON ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then echo "::error::Required secret $name is missing"; exit 1; fi
           done
