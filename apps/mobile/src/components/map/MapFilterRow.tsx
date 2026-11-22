@@ -103,6 +103,7 @@ export function MapFilterRow({
 	const navigation = useNavigation<Nav>();
 	const { colors, shadow } = useAppTheme();
 	const worldVisuals = useWorldModeVisuals();
+	const searchPlaceholder = suppliedPlaceholder ?? resolveWorldSearchPlaceholder(worldVisuals.id);
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
