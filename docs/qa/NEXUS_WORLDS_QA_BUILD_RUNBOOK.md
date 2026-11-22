@@ -9,7 +9,15 @@ Provide a manually triggered, short-retention APK artifact for physical testing 
 - Render workspace `g88`: `g88-api` is on `master`, auto-deploy is off, URL is the production `g88-api.onrender.com`; no staging API service or Render Postgres instance was listed.
 - Render workspace `g88` has only one Key Value instance, `g88-redis` (free plan, persistence off); no separate staging Redis exists. Do not reuse the production Redis for QA.
 - Therefore the staging DB project exists but has not been bootstrapped, and no staging API host is available/attested. Do not trigger the workflow yet.
-- Do not restore production user data into the staging project. Migration provenance/reconciliation and a separate staging API deployment are prerequisite gates.
+- Do not restore production user data into the staging project. A separate staging API and Redis are still required.
+
+## Fresh-database migration bootstrap evidence
+- The QA preflight includes `apps/backend/scripts/qa-empty-db-bootstrap.cjs`.
+- It refuses remote database targets and only connects to the named localhost disposable CI database `nexa_qa_bootstrap`.
+- It invokes the repository's actual `migrate.js` runner against an ephemeral PostgreSQL 17 + PostGIS container, then verifies the migration tracker matches every current `apps/backend/migrations/*.sql` filename and checks core schema objects/extensions.
+- This validates a clean bootstrap from the current repository baseline only. It does not copy Production data, restore the 85-name Production tracker, prove Production schema parity, or authorize changing Supabase staging.
+- Production G88 currently has 85 applied migration names while this checkout has 70 SQL files. The 15-name historical provenance audit remains separate; do not stamp or replay those names just to create a fresh staging database.
+- The next safe staging design is a clean, isolated baseline using a dedicated migration/owner credential and a separate restricted runtime credential, followed by API auth/registration and map/discovery smoke tests. No real-user data is needed for first-run Worlds QA.
 
 ## Guardrails
 - Workflow is manual (`workflow_dispatch`) and does not publish GitHub Releases or tags.
