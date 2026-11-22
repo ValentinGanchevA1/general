@@ -82,13 +82,21 @@ async function main() {
       const required = await client.query(
         `SELECT
            to_regclass('public.users') IS NOT NULL AS users_exists,
+           to_regclass('public.events') IS NOT NULL AS events_exists,
+           to_regclass('public.listings') IS NOT NULL AS listings_exists,
+           to_regclass('public.conversations') IS NOT NULL AS conversations_exists,
+           to_regclass('public.messages') IS NOT NULL AS messages_exists,
+           to_regclass('public.device_tokens') IS NOT NULL AS device_tokens_exists,
+           to_regclass('public.v_discoverable_entity') IS NOT NULL AS discovery_view_exists,
            to_regclass('public.schema_migrations') IS NOT NULL AS tracker_exists,
            EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') AS postgis_exists,
            EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'citext') AS citext_exists,
            EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') AS pgcrypto_exists`,
       );
       const row = required.rows[0];
-      if (!row?.users_exists || !row?.tracker_exists ||
+      if (!row?.users_exists || !row?.events_exists || !row?.listings_exists ||
+          !row?.conversations_exists || !row?.messages_exists || !row?.device_tokens_exists ||
+          !row?.discovery_view_exists || !row?.tracker_exists ||
           !row?.postgis_exists || !row?.citext_exists || !row?.pgcrypto_exists) {
         throw new Error('Required fresh-schema objects or extensions are missing');
       }
