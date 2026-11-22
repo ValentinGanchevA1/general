@@ -31,12 +31,31 @@ env:
 
 jobs:
   config-preflight:
-    name: Verify QA-only configuration and production isolation
+    name: Mobile CI and QA configuration preflight
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared
+        run: pnpm --filter @g88/shared build
+      - name: Mobile lint
+        run: pnpm --filter @g88/mobile exec eslint src --ext .ts,.tsx --max-warnings 0
+      - name: Mobile typecheck
+        run: pnpm --filter @g88/mobile typecheck
+      - name: MapLibre release config gate
+        run: node --test apps/mobile/scripts/maplibre-release-config.test.mjs
+      - name: Legal URL and publication gates
+        run: node --test apps/mobile/scripts/legal-url-gate.test.mjs apps/mobile/scripts/legal-publication-gate.test.mjs
+      - name: Mobile Jest
+        run: pnpm --filter @g88/mobile exec jest --ci
       - name: Verify explicit Worlds QA gate and production fallback
         run: |
           set -euo pipefail
