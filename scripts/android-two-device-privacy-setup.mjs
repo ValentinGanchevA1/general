@@ -7,13 +7,35 @@ const require = createRequire(new URL('../apps/mobile/package.json', import.meta
 const { io } = require('socket.io-client');
 
 const STATE_FILE = process.env.DEVICE_E2E_STATE_FILE ?? '.tmp/android-two-device-privacy.json';
-const BASE = process.env.DEVICE_E2E_BASE_URL ?? 'https://g88-api.onrender.com';
-const API = `${BASE}/api/v1`;
 const command = process.argv[2] ?? 'prepare';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+function validatedBaseUrl(value) {
+  assert(typeof value === 'string' && value.trim().length > 0,
+    'DEVICE_E2E_BASE_URL is required; configure a dedicated non-production QA API host.');
+  let parsed;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new Error('DEVICE_E2E_BASE_URL must be a valid HTTPS origin.');
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  assert(parsed.protocol === 'https:' && parsed.username === '' && parsed.password === ''
+    && parsed.pathname === '/' && parsed.search === '' && parsed.hash === '',
+    'DEVICE_E2E_BASE_URL must be an HTTPS origin without credentials, path, query or fragment.');
+  const productionHosts = new Set(['g88-api.onrender.com', 'api.g88.app', 'g88.app', 'www.g88.app']);
+  assert(!productionHosts.has(hostname) && !hostname.endsWith('.g88.app'),
+    'Refusing to create test accounts or conversations against the Production API.');
+  assert(hostname !== 'localhost' && hostname !== '127.0.0.1' && !/^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(hostname),
+    'DEVICE_E2E_BASE_URL must resolve through a dedicated non-production DNS hostname.');
+  return parsed.origin;
+}
+
+const BASE = validatedBaseUrl(process.env.DEVICE_E2E_BASE_URL);
+const API = `${BASE}/api/v1`;
 
 async function readJson(response) {
   return response.json().catch(() => null);
@@ -199,21 +221,24 @@ async function deleteAccount(user, password) {
     },
     body: JSON.stringify({ confirm: 'DELETE', password }),
   });
-  if (response.status !== 204 && response.status !== 401 && response.status !== 404) {
+  if (response.status !== 204 && response.status !== 404) {
     throw new Error(`cleanup failed: HTTP ${response.status}`);
   }
+  return response.status === 204;
 }
 
 async function cleanup() {
   const state = await loadState().catch(() => null);
   if (!state) return;
-  await Promise.allSettled([
-    deleteAccount(state.a, state.password),
-    deleteAccount(state.b, state.password),
-    deleteAccount(state.c, state.password),
-    deleteAccount(state.d, state.password),
-  ]);
-  console.log('[device-e2e] cleanup requested for synthetic accounts');
+  const entries = [['A', state.a], ['B', state.b], ['C', state.c], ['D', state.d]];
+  const results = await Promise.allSettled(entries.map(([, user]) => deleteAccount(user, state.password)));
+  const failures = results.flatMap((result, index) => result.status === 'rejected'
+    ? [`${entries[index][0]} (${entries[index][1]?.email ?? 'unknown account'}): ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`]
+    : []);
+  if (failures.length > 0) {
+    throw new Error(`Synthetic QA account cleanup incomplete: ${failures.join('; ')}`);
+  }
+  console.log('[device-e2e] all four synthetic QA accounts deleted or already absent');
 }
 
 if (command === 'prepare') {
