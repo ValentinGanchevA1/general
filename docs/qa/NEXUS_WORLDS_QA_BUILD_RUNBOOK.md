@@ -31,12 +31,17 @@ Optional:
 - `GOOGLE_WEB_CLIENT_ID_QA` — if absent, Google Sign-In is not part of this QA run; use email/password for onboarding validation.
 - No Sentry DSN is injected, so QA actions do not send events to the production Sentry project.
 
+## Trigger behavior
+- The branch has a push trigger restricted to `feat/nexus-worlds-qa-build-20261122` and only the workflow/config files.
+- The job is skipped unless the repository Actions variable `NEXUS_WORLDS_QA_API_HOST` is configured. Set it to a verified non-production bare hostname only after staging is ready.
+- GitHub `workflow_dispatch` is also declared, but GitHub only exposes manual dispatch after the workflow file exists on the default branch. Until then, use the gated branch push path. See [GitHub's workflow event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
+
 ## Run — only after all infrastructure gates pass
 1. Confirm a reachable staging API service whose runtime `DATABASE_URL` targets the isolated project ref `dvpgvchvackudnjyosag`, and whose Redis/integrations are isolated.
 2. Confirm the staging database has the approved schema/migration baseline. The currently observed project is empty; do not run the app against it yet.
 3. Confirm non-production Firebase, Maps and MapTiler credentials are configured as the QA secrets above.
-4. Actions → Android Worlds QA APK → Run workflow.
-5. Supply the staging hostname only (for example, a verified staging service hostname; do not use production).
+4. Add repository Actions variable `NEXUS_WORLDS_QA_API_HOST` with the verified staging API hostname.
+5. Push a change to one of the workflow's watched paths on the dedicated QA branch; the push trigger then runs the QA APK build. After the workflow is on the default branch, it can also be launched manually and a host supplied as input.
 6. Download the artifact only after workflow success.
 7. Install on Huawei Nova 11 and run the acceptance tests below.
 
