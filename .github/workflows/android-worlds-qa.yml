@@ -97,7 +97,8 @@ jobs:
           sudo apt-get install -y -qq libz3-4
           candidates=$(find node_modules -type f -name hermesc)
           test -n "$candidates"
-          count=0          while IFS= read -r candidate; do
+          count=0
+          while IFS= read -r candidate; do
             if file "$candidate" | grep -q ELF; then
               chmod +x "$candidate"
               "$candidate" -version
@@ -146,14 +147,15 @@ jobs:
           BADGING="$("$AAPT" dump badging "$APK")"
           printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
-          APK_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | awk 'tolower($0) ~ /sha-1 digest:/ { line=tolower($0); sub(/^.*sha-1 digest:[[:space:]]*/, "", line); gsub(/[^0-9a-f]/, "", line); print line; exit }')"
+          SHA_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-1 digest:' || true)"
+          APK_SHA1="$(printf '%s\n' "$SHA_LINE" | sed -E 's/^.*sha-1 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           KEY_SHA1="$(keytool -exportcert -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sha1sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
-          if ! [[ "$APK_SHA1" =~ ^[0-9a-f]{40}$ ]]; then
+          if [ "${#APK_SHA1}" -ne 40 ] || [[ "$APK_SHA1" == *[!0-9a-f]* ]]; then
             echo "::error::Could not extract a valid SHA-1 digest from apksigner output."
             printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-1 digest' || true
             exit 1
           fi
-          if ! [[ "$KEY_SHA1" =~ ^[0-9a-f]{40}$ ]]; then
+          if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
             echo "::error::Could not calculate a valid SHA-1 digest from the QA debug keystore."
             exit 1
           fi
@@ -204,7 +206,8 @@ jobs:
           java-version: 17
       - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:          node-version-file: '.nvmrc'
+        with:
+          node-version-file: '.nvmrc'
           cache: pnpm
       - name: Validate QA host and secrets
         env:
@@ -271,14 +274,15 @@ jobs:
 
           "$APKSIGNER" verify --verbose "$APK"
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
-          APK_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | awk 'tolower($0) ~ /sha-1 digest:/ { line=tolower($0); sub(/^.*sha-1 digest:[[:space:]]*/, "", line); gsub(/[^0-9a-f]/, "", line); print line; exit }')"
+          SHA_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-1 digest:' || true)"
+          APK_SHA1="$(printf '%s\n' "$SHA_LINE" | sed -E 's/^.*sha-1 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           KEY_SHA1="$(keytool -exportcert -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sha1sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
-          if ! [[ "$APK_SHA1" =~ ^[0-9a-f]{40}$ ]]; then
+          if [ "${#APK_SHA1}" -ne 40 ] || [[ "$APK_SHA1" == *[!0-9a-f]* ]]; then
             echo "::error::Could not extract a valid SHA-1 digest from apksigner output."
             printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-1 digest' || true
             exit 1
           fi
-          if ! [[ "$KEY_SHA1" =~ ^[0-9a-f]{40}$ ]]; then
+          if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
             echo "::error::Could not calculate a valid SHA-1 digest from the QA debug keystore."
             exit 1
           fi
