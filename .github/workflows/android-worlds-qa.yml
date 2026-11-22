@@ -90,11 +90,19 @@ jobs:
           grep -Fq "const WORLDS_QA_MODE = process.env.NEXUS_WORLDS_QA === '1';" apps/mobile/src/config.ts
           grep -Fq "API_BASE_URL: __DEV__ || WORLDS_QA_MODE" apps/mobile/src/config.ts
           grep -Fq "'https://g88-api.onrender.com'" apps/mobile/src/config.ts
-          ! grep -Fq "secrets.GOOGLE_SERVICES_JSON }}" .github/workflows/android-worlds-qa.yml
-          ! grep -Fq "secrets.GOOGLE_MAPS_API_KEY_RELEASE }}" .github/workflows/android-worlds-qa.yml
-          ! grep -Fq "secrets.NEXA_MAPTILER_API_KEY }}" .github/workflows/android-worlds-qa.yml
-          ! grep -Fq "secrets.SENTRY_DSN }}" .github/workflows/android-worlds-qa.yml
-          echo "Worlds QA gate, production API fallback and QA-only provider secret boundaries verified."
+          grep -Fq 'secrets.GOOGLE_SERVICES_JSON_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'secrets.GOOGLE_MAPS_API_KEY_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'secrets.NEXA_MAPTILER_API_KEY_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'applicationId(nexusWorldsQaApplicationId ? "com.g88.qa" : "com.g88")' apps/mobile/android/app/build.gradle
+          grep -Fq 'android:scheme="${nexaUriScheme}"' apps/mobile/android/app/src/main/AndroidManifest.xml
+          grep -Fq 'signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug' apps/mobile/android/app/build.gradle
+          for forbidden in GOOGLE_SERVICES_JSON GOOGLE_MAPS_API_KEY_RELEASE NEXA_MAPTILER_API_KEY SENTRY_DSN ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+            if grep -Eq "secrets\\.${forbidden}[[:space:]]*}}" .github/workflows/android-worlds-qa.yml; then
+              echo "::error::Production credential reference found for ${forbidden}"
+              exit 1
+            fi
+          done
+          echo "Worlds QA gate, QA applicationId/data sandbox, QA deep-link scheme, debug signing and provider-secret boundaries verified."
 
   qa-apk:
     name: Worlds QA APK (isolated package / non-production API)
