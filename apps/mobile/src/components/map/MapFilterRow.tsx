@@ -28,6 +28,7 @@ import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/them
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 import { MapWorldSelector } from './MapWorldSelector';
+import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
@@ -272,7 +273,7 @@ export function MapFilterRow({
 					</Pressable>
 				</View>
 
-				<MapWorldSelector />
+				{WORLD_MODES_ENABLED ? <MapWorldSelector /> : null}
 
 				<Pressable
 					onPress={() => setMoreOpen(true)}
