@@ -11,7 +11,7 @@ describe('World map context aggregate (W2-7)', () => {
   it('keeps Bazaar suggestions aligned while preserving action-only affordances', () => {
     const bazaar = resolveWorldMapContext('bazaar');
     expect(bazaar.discoveryPreset?.lens).toBe('opportunities');
-    expect(bazaar.spatialSuggestion?.lens).toBeNull();
+    expect(bazaar.spatialSuggestion?.lens).toBe('opportunities');
     expect(bazaar.actions.map((a) => a.id)).toContain('view-listing');
   });
 
