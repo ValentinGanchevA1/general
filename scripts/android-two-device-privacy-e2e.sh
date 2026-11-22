@@ -6,7 +6,7 @@ APK_PATH="${DEVICE_E2E_APK_PATH:-apps/mobile/android/app/build/outputs/apk/relea
 SERIAL_A="${DEVICE_E2E_SERIAL_A:-emulator-5554}"
 SERIAL_B="${DEVICE_E2E_SERIAL_B:-emulator-5556}"
 UI=(python3 scripts/android-two-device-ui.py)
-PACKAGE=com.g88
+PACKAGE=com.g88.qa
 PROBE_PREFIX='[NEXA_E2E_DEVICE]'
 
 state() {
@@ -161,7 +161,7 @@ set_geo() {
 }
 
 assert_blocked_rejoin() {
-  local base_url="${DEVICE_E2E_BASE_URL:-https://g88-api.onrender.com}"
+  local base_url="${DEVICE_E2E_BASE_URL:?DEVICE_E2E_BASE_URL must point to the dedicated non-production QA API}"
 
   node --input-type=module - "$STATE_FILE" "$base_url" <<'NODE'
 import { readFile } from 'node:fs/promises';
