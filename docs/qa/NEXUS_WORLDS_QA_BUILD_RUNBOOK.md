@@ -23,7 +23,7 @@ Provide a manually triggered, short-retention APK artifact for physical testing 
 - Workflow is manual (`workflow_dispatch`) and does not publish GitHub Releases or tags.
 - API host is required as a bare hostname (no scheme, path or port). Production API hostnames and local/loopback hosts are rejected.
 - The host check is syntactic only. It cannot validate DNS aliases, CNAME targets, Redis, database, OAuth callbacks, webhooks, cron jobs, FCM or external service isolation. Operator verification is mandatory.
-- APK uses the existing Android package and upload signing key, so it can update the installed signed APK without uninstalling; it is not side-by-side. Use test accounts only.
+- QA APK uses applicationId `com.g88.qa`, a separate Android app sandbox, and the repository's non-production debug signing certificate. It installs side-by-side with Production and cannot inherit Production app-private storage/Keychain tokens. Its deep-link scheme is `nexa-qa`, so it does not claim Production `nexa://` links.
 - Artifact retention is five days.
 - The QA gate is `NEXUS_WORLDS_QA=1`; normal Release workflow does not set it.
 - No backend, database, permissions or production workflow changes are included in this PR.
@@ -41,12 +41,12 @@ Provide a manually triggered, short-retention APK artifact for physical testing 
 ## Required GitHub Actions secrets
 Configure these on the repository before running the workflow:
 - `NEXA_MAPTILER_API_KEY_QA`
-- `GOOGLE_MAPS_API_KEY_QA` — restrict to package `com.g88`, the upload signing certificate SHA-1, and only the required Maps APIs.
-- `GOOGLE_SERVICES_JSON_QA` — base64-encoded `google-services.json` for a separate Firebase QA project and package `com.g88`.
-- Existing Android upload signing secrets: `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS`, `ANDROID_UPLOAD_KEY_PASSWORD`.
+- `GOOGLE_MAPS_API_KEY_QA` — restrict to package `com.g88.qa`, the repository debug-keystore SHA-1 printed by the workflow, and only the required Maps APIs.
+- `GOOGLE_SERVICES_JSON_QA` — base64-encoded `google-services.json` for a separate Firebase QA project and package `com.g88.qa`.
+- No production Android upload-keystore secrets are needed. QA Release falls back to the repository debug keystore; the workflow verifies the APK certificate matches it.
 
 Optional:
-- `GOOGLE_WEB_CLIENT_ID_QA` — if absent, Google Sign-In is not part of this QA run; use email/password for onboarding validation.
+- `GOOGLE_WEB_CLIENT_ID_QA` — if absent, Google Sign-In is not part of this QA run; use email/password for onboarding validation. To enable Google Sign-In, the QA Firebase/OAuth Android client must be configured for `com.g88.qa` and the debug-keystore SHA-1.
 - No Sentry DSN is injected, so QA actions do not send events to the production Sentry project.
 
 ## Trigger behavior
@@ -76,7 +76,7 @@ Optional:
 - QA-10 storage write/cleanup failure paths (unit tests/debug fixture; don't force destructive device storage actions).
 
 ## Caveats
-- This QA APK is a Release-type APK using the production app ID and upload signing identity; it is not a separate installable app.
+- This QA APK is a Release-type APK using `com.g88.qa` and the repository debug signing key. It is a separate installable app; it cannot update Production and does not share Production app-private tokens/data.
 - Workflow host validation is not a network or infrastructure attestation. Verify the Render service environment privately before running.
 - Supabase staging branch/project existence is not proof that migrations, data, or API connectivity are ready.
 - Do not use production database credentials, production Firebase config, production Maps key, production MapTiler key, or production Sentry DSN.
