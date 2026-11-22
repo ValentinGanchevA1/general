@@ -1,5 +1,6 @@
 import {
   buildPlaceDeepLink,
+  createPlaceDeepLinkCodec,
   parsePlaceDeepLink,
   placeDeepLinkQueue,
 } from './placeDeepLink';
@@ -20,22 +21,15 @@ describe('placeDeepLink', () => {
   });
 
   it('uses an isolated QA scheme and never accepts Production place links in QA', () => {
-    const previous = process.env.NEXUS_WORLDS_QA;
-    process.env.NEXUS_WORLDS_QA = '1';
-    try {
-      jest.isolateModules(() => {
-        const qaLinks = jest.requireActual<typeof import('./placeDeepLink')>('./placeDeepLink');
-        expect(qaLinks.buildPlaceDeepLink(PLACE_ID)).toBe(`nexa-qa://place/${PLACE_ID}`);
-        expect(qaLinks.parsePlaceDeepLink(`nexa-qa://place/${PLACE_ID}`)).toBe(PLACE_ID);
-        expect(qaLinks.parsePlaceDeepLink(`nexa://place/${PLACE_ID}`)).toBeNull();
-      });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.NEXUS_WORLDS_QA;
-      } else {
-        process.env.NEXUS_WORLDS_QA = previous;
-      }
-    }
+    const qaLinks = createPlaceDeepLinkCodec('nexa-qa');
+    const productionLinks = createPlaceDeepLinkCodec('nexa');
+
+    expect(qaLinks.build(PLACE_ID)).toBe(`nexa-qa://place/${PLACE_ID}`);
+    expect(qaLinks.parse(`nexa-qa://place/${PLACE_ID}`)).toBe(PLACE_ID);
+    expect(qaLinks.parse(`nexa://place/${PLACE_ID}`)).toBeNull();
+
+    expect(productionLinks.build(PLACE_ID)).toBe(`nexa://place/${PLACE_ID}`);
+    expect(productionLinks.parse(`nexa-qa://place/${PLACE_ID}`)).toBeNull();
   });
 
   it('parses exact place resources and ignores unrelated or malformed URLs', () => {
