@@ -19,12 +19,12 @@ describe('placeDeepLink', () => {
     expect(() => buildPlaceDeepLink('not-a-place')).toThrow('invalid place ID');
   });
 
-  it('uses an isolated QA scheme and never accepts Production place links in QA', () => {
+  it('uses an isolated QA scheme and never accepts Production place links in QA', async () => {
     const previous = process.env.NEXUS_WORLDS_QA;
     process.env.NEXUS_WORLDS_QA = '1';
     try {
-      jest.isolateModules(() => {
-        const qaLinks = require('./placeDeepLink') as typeof import('./placeDeepLink');
+      await jest.isolateModulesAsync(async () => {
+        const qaLinks = await import('./placeDeepLink');
         expect(qaLinks.buildPlaceDeepLink(PLACE_ID)).toBe(`nexa-qa://place/${PLACE_ID}`);
         expect(qaLinks.parsePlaceDeepLink(`nexa-qa://place/${PLACE_ID}`)).toBe(PLACE_ID);
         expect(qaLinks.parsePlaceDeepLink(`nexa://place/${PLACE_ID}`)).toBeNull();
