@@ -147,26 +147,34 @@ jobs:
           BADGING="$("$AAPT" dump badging "$APK")"
           printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
-          SHA_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-1 digest:' || true)"
-          APK_SHA1="$(printf '%s\n' "$SHA_LINE" | sed -E 's/^.*sha-1 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
-          KEY_SHA1="$(keytool -exportcert -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sha1sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
-          if [ "${#APK_SHA1}" -ne 40 ] || [[ "$APK_SHA1" == *[!0-9a-f]* ]]; then
-            echo "::error::Could not extract a valid SHA-1 digest from apksigner output."
-            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-1 digest' || true
+          SHA256_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-256 digest:' || true)"
+          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA256="$(keytool -exportcert -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
+          KEY_CERT_DETAILS="$(LC_ALL=C keytool -list -v -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null)"
+          KEY_SHA1_LINE="$(printf '%s\n' "$KEY_CERT_DETAILS" | grep -i -m1 '^[[:space:]]*SHA1:' || true)"
+          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          if [ "${#APK_SHA256}" -ne 64 ] || [[ "$APK_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not extract a valid SHA-256 certificate digest from apksigner output."
+            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-256 digest' || true
+            exit 1
+          fi
+          if [ "${#KEY_SHA256}" -ne 64 ] || [[ "$KEY_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not calculate a valid SHA-256 certificate digest from the QA debug keystore."
             exit 1
           fi
           if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
-            echo "::error::Could not calculate a valid SHA-1 digest from the QA debug keystore."
+            echo "::error::Could not read a valid SHA-1 fingerprint from the QA debug keystore."
             exit 1
           fi
-          if [ "$APK_SHA1" != "$KEY_SHA1" ]; then
+          if [ "$APK_SHA256" != "$KEY_SHA256" ]; then
             echo "::error::QA APK signer fingerprint does not match the repository debug keystore."
-            echo "APK signer SHA-1: $APK_SHA1"
-            echo "Expected debug-key SHA-1: $KEY_SHA1"
+            echo "APK signer SHA-256: $APK_SHA256"
+            echo "Expected debug-key SHA-256: $KEY_SHA256"
             exit 1
           fi
+          KEY_SHA1_PRETTY="$(printf '%s' "$KEY_SHA1" | sed -E 's/(..)/\1:/g; s/:$//' | tr '[:lower:]' '[:upper:]')"
           echo "Isolated QA APK package and debug signer verified."
-          echo "QA debug SHA-1 for Maps key restriction: $APK_SHA1"
+          echo "QA debug SHA-1 for Maps key restriction: $KEY_SHA1_PRETTY"
       - name: Verify explicit Worlds QA gate and production fallback
         run: |
           set -euo pipefail
@@ -274,24 +282,36 @@ jobs:
 
           "$APKSIGNER" verify --verbose "$APK"
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
-          SHA_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-1 digest:' || true)"
-          APK_SHA1="$(printf '%s\n' "$SHA_LINE" | sed -E 's/^.*sha-1 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
-          KEY_SHA1="$(keytool -exportcert -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sha1sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
-          if [ "${#APK_SHA1}" -ne 40 ] || [[ "$APK_SHA1" == *[!0-9a-f]* ]]; then
-            echo "::error::Could not extract a valid SHA-1 digest from apksigner output."
-            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-1 digest' || true
+          SHA256_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-256 digest:' || true)"
+          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA256="$(keytool -exportcert -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
+          KEY_CERT_DETAILS="$(LC_ALL=C keytool -list -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null)"
+          KEY_SHA1_LINE="$(printf '%s\n' "$KEY_CERT_DETAILS" | grep -i -m1 '^[[:space:]]*SHA1:' || true)"
+          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          if [ "${#APK_SHA256}" -ne 64 ] || [[ "$APK_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not extract a valid SHA-256 certificate digest from apksigner output."
+            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-256 digest' || true
+            exit 1
+          fi
+          if [ "${#KEY_SHA256}" -ne 64 ] || [[ "$KEY_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not calculate a valid SHA-256 certificate digest from the QA debug keystore."
             exit 1
           fi
           if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
-            echo "::error::Could not calculate a valid SHA-1 digest from the QA debug keystore."
+            echo "::error::Could not read a valid SHA-1 fingerprint from the QA debug keystore."
             exit 1
           fi
-          if [ "$APK_SHA1" != "$KEY_SHA1" ]; then
+          if [ "$APK_SHA256" != "$KEY_SHA256" ]; then
             echo "::error::QA APK signer fingerprint does not match the repository debug keystore."
-            echo "APK signer SHA-1: $APK_SHA1"
-            echo "Expected debug-key SHA-1: $KEY_SHA1"
+            echo "APK signer SHA-256: $APK_SHA256"
+            echo "Expected debug-key SHA-256: $KEY_SHA256"
             exit 1
           fi
+          KEY_SHA1_PRETTY="$(printf '%s' "$KEY_SHA1" | sed -E 's/(..)/\1:/g; s/:$//' | tr '[:lower:]' '[:upper:]')"
+          echo "QA applicationId: com.g88.qa"
+          echo "QA deep link scheme: nexa-qa"
+          echo "Non-production debug signing SHA-1 for GOOGLE_MAPS_API_KEY_QA restriction: $KEY_SHA1_PRETTY"
+          sha256sum "$APK"
 
           echo "QA applicationId: com.g88.qa"
           echo "QA deep link scheme: nexa-qa"
