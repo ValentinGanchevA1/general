@@ -188,9 +188,7 @@ async function prepare() {
 
   await mkdir(dirname(STATE_FILE), { recursive: true });
   const persistState = async () => {
-    const temporaryPath = `${STATE_FILE}.tmp`;
-    await writeFile(temporaryPath, JSON.stringify(state, null, 2), { mode: 0o600 });
-    await rename(temporaryPath, STATE_FILE);
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
   };
   await persistState();
 
