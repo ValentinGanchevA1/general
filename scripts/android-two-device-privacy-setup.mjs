@@ -165,21 +165,6 @@ async function promoteConversation(owner, peer, conversationId, runId, label) {
   }
 }
 
-async function createPair(firstLabel, secondLabel, runId, password) {
-  const sharedInterest = `device-privacy-${firstLabel.toLowerCase()}${secondLabel.toLowerCase()}-${runId}`;
-  const [first, second] = await Promise.all([
-    register(firstLabel, runId, password),
-    register(secondLabel, runId, password),
-  ]);
-  await Promise.all([
-    completeProfile(first, sharedInterest),
-    completeProfile(second, sharedInterest),
-  ]);
-  const conversationId = await openConversation(first, second);
-  await promoteConversation(first, second, conversationId, runId, `${firstLabel}${secondLabel}`);
-  return { first, second, conversationId };
-}
-
 async function prepare() {
   const secret = randomBytes(12).toString('hex');
   const runId = `${Date.now()}-${secret.slice(0, 8)}`;
