@@ -146,7 +146,7 @@ jobs:
           test -x "$APKSIGNER"
           BADGING="$("$AAPT" dump badging "$APK")"
           printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
-          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | grep -Eo '[A-Fa-f0-9]{40}' | head -n1 | tr '[:upper:]' '[:lower:]')"
+          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-1 digest: //p' | head -n1 | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           KEY_SHA1="$(keytool -exportcert -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sha1sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
           test -n "$APK_SHA1"
           test -n "$KEY_SHA1"
