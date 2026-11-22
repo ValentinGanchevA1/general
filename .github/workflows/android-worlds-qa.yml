@@ -31,7 +31,7 @@ env:
 
 jobs:
   config-preflight:
-    name: Mobile CI and QA configuration preflight
+    name: Mobile CI and offline DB safety preflight
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,6 +56,13 @@ jobs:
         run: node --test apps/mobile/scripts/legal-url-gate.test.mjs apps/mobile/scripts/legal-publication-gate.test.mjs
       - name: Mobile Jest
         run: pnpm --filter @g88/mobile exec jest --ci
+      - name: Offline migration provenance and staging safety tests
+        run: >-
+          node --test
+          apps/backend/scripts/migration-source-candidates.test.cjs
+          apps/backend/scripts/migration-reconciliation-report.test.cjs
+          apps/backend/scripts/db-target-attestation.test.cjs
+          apps/backend/scripts/staging-target-preflight.test.cjs
       - name: Verify explicit Worlds QA gate and production fallback
         run: |
           set -euo pipefail
