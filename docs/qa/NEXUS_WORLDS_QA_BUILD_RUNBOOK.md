@@ -29,6 +29,15 @@ Provide a manually triggered, short-retention APK artifact for physical testing 
 - No backend, database, permissions or production workflow changes are included in this PR.
 - QA APK uses dedicated non-production provider credentials; it must not fall back to production Firebase/Maps/MapTiler/Sentry credentials.
 
+## Fresh-database migration bootstrap evidence (2026-11-22)
+- GitHub Actions run #11: [Android Worlds QA APK — disposable PostgreSQL 17 bootstrap](https://github.com/ValentinGanchevA1/general/actions/runs/45013449398).
+- The workflow started an ephemeral `postgis/postgis:17-3.7` service on the GitHub-hosted runner. No Supabase or Render database was used by this step.
+- The actual repository `apps/backend/scripts/migrate.js` runner applied **70/70** current migration files to that empty disposable database.
+- A read-only verification transaction confirmed an exact filename match (70 applied / 70 source files), required core objects (`users`, `events`, `listings`, `conversations`, `messages`, `device_tokens`, `v_discoverable_entity`) and extensions (PostGIS, citext, pgcrypto).
+- The bootstrap script refuses any database URL except the named localhost disposable target `nexa_qa_bootstrap`; dedicated tests reject Supabase/Render hosts, wrong DB/user/port and non-PostgreSQL protocols.
+- The same run passed Mobile Jest (**138 suites / 733 tests**), lint, typecheck, MapLibre/legal gates and offline DB/provenance checks (**26 subtests, 0 failures**).
+- This is evidence that the **current 70-file source-controlled baseline can build a fresh PostgreSQL 17 schema**. It does not prove Production equivalence, apply the 15 historical Production tracker names, populate the actual `NEXUS-STAGING` project, verify the Render runtime credentials, or certify API-level auth/discovery. No Production or Supabase staging state was mutated by the CI job.
+
 ## Required GitHub Actions secrets
 Configure these on the repository before running the workflow:
 - `NEXA_MAPTILER_API_KEY_QA`
