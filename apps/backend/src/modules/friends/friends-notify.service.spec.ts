@@ -26,8 +26,8 @@ describe('FriendsNotifyService', () => {
 
     await service.onRequestAccepted('requester-uuid', 'peer-uuid');
 
-    expect(db.query).toHaveBeenCalledTimes(1);
-    const [sql, params] = db.query.mock.calls[0] as [string, unknown[]];
+    expect(db.query).toHaveBeenCalledTimes(2);
+    const [sql, params] = db.query.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('$2::uuid');
     expect(sql).toContain("'userId', $2::uuid::text");
     expect(params).toEqual([
