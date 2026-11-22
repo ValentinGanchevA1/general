@@ -8,7 +8,7 @@
 - G88 has **85 applied names** in `public.schema_migrations`; current checkout has 70 baseline migrations and **15 unknown historical names**. Draft #1093 stages a separate `0078` file; it is **not applied**.
 - Render g88-api runtime `DATABASE_URL` remains **unattested**. Render Auto Deploy is OFF; current live code predates backend GET /auth/age-eligibility.
 - Supabase Data API is **OFF** per owner's dashboard; SQL table/sequence rights were hardened through #1098. Neither is a substitute for backup or private data isolation.
-- Historical source candidates are available for 14/15 names (#1101); `0054_posthog_deletion_queue.sql` remains without original Git SQL proof.
+- The companion source-provenance audit and manifest now record Git source candidates for all 15/15 names, including `0054_posthog_deletion_queue.sql` recovered from the archived pre-force-push PR #829 Actions head. Its Git blob is byte-identical to the current `0062_posthog_deletion_queue.sql` blob. This authenticates historical source bytes only; the production tracker has no SQL checksum, so the exact SQL executed in G88 remains unproven. Do not infer execution, replay migrations or edit tracker rows from this source match.
 
 ## Order of operations — no skips
 
