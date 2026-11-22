@@ -264,7 +264,7 @@ jobs:
           fi
 
           "$APKSIGNER" verify --verbose "$APK"
-          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-1 digest:/ {print $2; exit}' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | awk 'tolower($0) ~ /sha-1 digest:/ {print substr($0, index($0, \":\")+1); exit}' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           KEY_SHA1="$(keytool -list -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sed -n 's/.*SHA1: //p' | head -n1 | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
           test -n "$APK_SHA1"
           test -n "$KEY_SHA1"
