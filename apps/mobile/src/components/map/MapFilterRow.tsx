@@ -27,6 +27,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
+import { resolveWorldSearchPlaceholder } from '@/features/worldModes/worldSearchPlaceholder';
 import { MapWorldSelector } from './MapWorldSelector';
 import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
 
@@ -97,11 +98,12 @@ export function MapFilterRow({
 	rankBy,
 	onRankByChange,
 	top,
-	placeholder = 'Search nearby',
+	placeholder: suppliedPlaceholder,
 }: MapFilterRowProps): React.JSX.Element {
 	const navigation = useNavigation<Nav>();
 	const { colors, shadow } = useAppTheme();
 	const worldVisuals = useWorldModeVisuals();
+	const searchPlaceholder = suppliedPlaceholder ?? resolveWorldSearchPlaceholder(worldVisuals.id);
 	const styles = useMemo(() => createStyles(colors), [colors]);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [searchFocused, setSearchFocused] = useState(false);
@@ -192,7 +194,7 @@ export function MapFilterRow({
 						onChangeText={onChangeText}
 						onFocus={() => setSearchFocused(true)}
 						onBlur={() => setSearchFocused(false)}
-						placeholder={placeholder}
+						placeholder={searchPlaceholder}
 						placeholderTextColor={colors.textTertiary}
 						selectionColor={colors.discovery}
 						style={styles.searchInput}
