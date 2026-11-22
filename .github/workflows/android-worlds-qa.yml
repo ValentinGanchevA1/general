@@ -1,0 +1,114 @@
+name: Android Worlds QA APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_host:
+        description: "Non-production API host for QA (required; production is blocked)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NEXUS_WORLDS_QA: "1"
+  API_HOST: ${{ inputs.api_host }}
+  NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY }}
+  NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
+  NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
+
+jobs:
+  qa-apk:
+    name: Worlds QA APK (non-production API)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Validate QA host and secrets
+        env:
+          GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
+          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          node -e 'const h=process.env.API_HOST.trim(); if(!h || h.includes("api.g88.app") || h.includes("localhost") || h.includes("127.0.0.1")) { console.error("Rejected API_HOST: provide a reachable non-production QA host."); process.exit(1); }'
+          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_DEBUG GOOGLE_MAPS_API_KEY_RELEASE GOOGLE_SERVICES_JSON ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then echo "::error::Required secret $name is missing"; exit 1; fi
+          done
+          echo "QA host and required secrets validated."
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Ensure Hermes compiler binaries are runnable
+        working-directory: .
+        run: |
+          sudo apt-get update && sudo apt-get install -y libz3-4
+          candidates=$(find node_modules -type f -name hermesc)
+          test -n "$candidates"
+          count=0
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q ELF; then chmod +x "$candidate"; "$candidate" -version; count=$((count+1)); fi
+          done <<< "$candidates"
+          test "$count" -gt 0
+      - name: Inject Android config
+        env:
+          GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
+          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cat >> android/local.properties <<EOF
+          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_DEBUG}
+          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_RELEASE}
+          RELEASE_STORE_FILE=app/upload.keystore
+          RELEASE_STORE_PASSWORD=${ANDROID_UPLOAD_STORE_PASSWORD}
+          RELEASE_KEY_ALIAS=${ANDROID_UPLOAD_KEY_ALIAS}
+          RELEASE_KEY_PASSWORD=${ANDROID_UPLOAD_KEY_PASSWORD}
+          EOF
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload.keystore
+      - name: Build QA APK (Release variant, QA flag only)
+        env:
+          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_DIST: qa-${{ github.run_number }}
+          SENTRY_RELEASE: com.g88@qa-${{ github.run_number }}
+          NEXUS_WORLDS_QA: "1"
+          API_HOST: ${{ inputs.api_host }}
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }}
+      - name: Verify APK exists
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          sha256sum "$APK"
+      - name: Upload QA APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nexus-worlds-qa-apk-${{ github.run_number }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 5
