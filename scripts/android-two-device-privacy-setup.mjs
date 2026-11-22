@@ -184,30 +184,43 @@ async function prepare() {
   const secret = randomBytes(12).toString('hex');
   const runId = `${Date.now()}-${secret.slice(0, 8)}`;
   const password = `DevicePass${secret}Aa1`;
-
-  const [revocationPair, authorizedPair] = await Promise.all([
-    createPair('A', 'B', runId, password),
-    createPair('C', 'D', runId, password),
-  ]);
+  const state = { baseUrl: BASE, password, a: null, b: null, c: null, d: null };
 
   await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(
-    STATE_FILE,
-    JSON.stringify({
-      baseUrl: BASE,
-      password,
-      a: revocationPair.first,
-      b: revocationPair.second,
-      abConversationId: revocationPair.conversationId,
-      c: authorizedPair.first,
-      d: authorizedPair.second,
-      cdConversationId: authorizedPair.conversationId,
-    }, null, 2),
-    { mode: 0o600 },
-  );
-  console.log(`[device-e2e] prepared isolated A/B and C/D accepted conversations (${runId})`);
-}
+  const persistState = async () => {
+    const temporaryPath = `${STATE_FILE}.tmp`;
+    await writeFile(temporaryPath, JSON.stringify(state, null, 2), { mode: 0o600 });
+    await rename(temporaryPath, STATE_FILE);
+  };
+  await persistState();
 
+  // Persist each account immediately so `always()` cleanup can recover even if
+  // a later registration, profile update, conversation or socket setup fails.
+  for (const label of ['A', 'B', 'C', 'D']) {
+    const key = label.toLowerCase();
+    state[key] = await register(label, runId, password);
+    await persistState();
+  }
+
+  const sharedAbInterest = `device-privacy-ab-${runId}`;
+  const sharedCdInterest = `device-privacy-cd-${runId}`;
+  await Promise.all([
+    completeProfile(state.a, sharedAbInterest),
+    completeProfile(state.b, sharedAbInterest),
+    completeProfile(state.c, sharedCdInterest),
+    completeProfile(state.d, sharedCdInterest),
+  ]);
+
+  state.abConversationId = await openConversation(state.a, state.b);
+  await persistState();
+  await promoteConversation(state.a, state.b, state.abConversationId, runId, 'AB');
+
+  state.cdConversationId = await openConversation(state.c, state.d);
+  await persistState();
+  await promoteConversation(state.c, state.d, state.cdConversationId, runId, 'CD');
+
+  console.log(`[device-e2e] prepared isolated QA A/B and C/D accepted conversations (${runId})`);
+}
 async function loadState() {
   return JSON.parse(await readFile(STATE_FILE, 'utf8'));
 }
@@ -230,7 +243,12 @@ async function deleteAccount(user, password) {
 async function cleanup() {
   const state = await loadState().catch(() => null);
   if (!state) return;
-  const entries = [['A', state.a], ['B', state.b], ['C', state.c], ['D', state.d]];
+  const entries = [['A', state.a], ['B', state.b], ['C', state.c], ['D', state.d]]
+    .filter(([, user]) => typeof user?.accessToken === 'string');
+  if (entries.length === 0) {
+    console.log('[device-e2e] no synthetic QA accounts were created');
+    return;
+  }
   const results = await Promise.allSettled(entries.map(([, user]) => deleteAccount(user, state.password)));
   const failures = results.flatMap((result, index) => result.status === 'rejected'
     ? [`${entries[index][0]} (${entries[index][1]?.email ?? 'unknown account'}): ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`]
@@ -238,7 +256,7 @@ async function cleanup() {
   if (failures.length > 0) {
     throw new Error(`Synthetic QA account cleanup incomplete: ${failures.join('; ')}`);
   }
-  console.log('[device-e2e] all four synthetic QA accounts deleted or already absent');
+  console.log(`[device-e2e] all ${entries.length} created synthetic QA accounts deleted or already absent`);
 }
 
 if (command === 'prepare') {
