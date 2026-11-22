@@ -56,8 +56,8 @@ export class FriendsNotifyService {
       await this.db.query(
         `INSERT INTO personal_activity_notifications
            (recipient_id, actor_id, kind, source_type, source_id, destination)
-         VALUES ($1, $2, 'friend_accepted', 'friendship', $3,
-                 jsonb_build_object('type', 'profile', 'userId', $2::text))
+         VALUES ($1, $2::uuid, 'friend_accepted', 'friendship', $3,
+                 jsonb_build_object('type', 'profile', 'userId', $2::uuid::text))
          ON CONFLICT (recipient_id, source_type, source_id) DO NOTHING`,
         [requesterId, peer.id, this.friendshipSourceId(requesterId, peer.id)],
       );
