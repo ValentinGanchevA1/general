@@ -27,6 +27,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { fontSize, radius, spacing, useAppTheme, type ThemeColors } from '@/theme';
 import { MAP_LAYER_ROW_HEIGHT, MAP_SEARCH_BAR_HEIGHT } from './mapChromeLayout';
 import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
+import { MapWorldSelector } from './MapWorldSelector';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
@@ -270,6 +271,8 @@ export function MapFilterRow({
 						<Text numberOfLines={1} style={[styles.layerText, { color: publicPlacesEnabled ? colors.discovery : colors.textSecondary }]}>Places</Text>
 					</Pressable>
 				</View>
+
+				<MapWorldSelector />
 
 				<Pressable
 					onPress={() => setMoreOpen(true)}
