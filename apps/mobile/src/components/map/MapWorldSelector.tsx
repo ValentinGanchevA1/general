@@ -7,6 +7,7 @@ import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 import { worldModePalettes } from '@/theme/worldModePalettes';
 import { activateWorldMode, clearWorldModeError } from '@/features/worldModes/worldModesSlice';
 import { WORLD_MODES, WORLD_MODE_IDS, type WorldModeId } from '@/features/worldModes/worldModes';
+import { resolveWorldMapContext } from '@/features/worldModes/worldMapContext';
 
 export function MapWorldSelector(): React.JSX.Element {
   const { colors } = useAppTheme();
@@ -15,6 +16,9 @@ export function MapWorldSelector(): React.JSX.Element {
   const userId = useAppSelector((state) => state.auth.user?.id ?? null);
   const { selectedId, ownerId, hydrated, saving, error } = useAppSelector((state) => state.worldModes);
   const [open, setOpen] = useState(false);
+  const mapContext = resolveWorldMapContext(selectedId);
+  const discoveryPreset = mapContext.discoveryPreset;
+  const suggestedActions = mapContext.actions;
 
   const choose = async (id: WorldModeId): Promise<void> => {
     if (!userId || ownerId !== userId || !hydrated || saving || id === selectedId) return;
@@ -52,6 +56,28 @@ export function MapWorldSelector(): React.JSX.Element {
                 <Icon name="close" size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
+            <View testID="map-world-context-preview" style={styles.contextPreview} accessibilityLabel={
+              'Suggested map focus: ' + (discoveryPreset?.label ?? 'Shared NEXUS map') +
+              (mapContext.spatialSuggestion ? ', suggested lens: ' + mapContext.spatialSuggestion.lens : '')
+            }>
+              <Text style={styles.contextEyebrow}>SUGGESTED MAP FOCUS</Text>
+              <Text style={styles.contextLabel}>{discoveryPreset?.label ?? 'Shared NEXUS map'}</Text>
+              {mapContext.spatialSuggestion ? (
+                <Text style={styles.contextLens}>
+                  Suggested lens: {mapContext.spatialSuggestion.lens === 'experiences' ? 'Experiences' : 'Opportunities'}
+                </Text>
+              ) : null}
+              {discoveryPreset?.emphasis.length ? (
+                <Text style={styles.contextEmphasis}>{discoveryPreset.emphasis.map(formatEmphasisLabel).join(' · ')}</Text>
+              ) : null}
+              {suggestedActions.length > 0 ? (
+                <Text style={styles.contextActions}>
+                  Suggested actions: {suggestedActions.map((action) => action.label).join(' · ')}
+                </Text>
+              ) : (
+                <Text style={styles.contextActions}>Use the shared map controls for discovery</Text>
+              )}
+            </View>
             <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
               {WORLD_MODE_IDS.map((id) => {
                 const world = WORLD_MODES[id];
@@ -81,12 +107,16 @@ export function MapWorldSelector(): React.JSX.Element {
               })}
             </ScrollView>
             {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-            <Text style={styles.disclaimer}>World context currently changes visual identity only. Privacy, permissions, trust, ranking and discovery access remain unchanged.</Text>
+            <Text style={styles.disclaimer}>These are suggestions only. Your map layers, filters, ranking, privacy, permissions and discovery access do not change automatically.</Text>
           </View>
         </View>
       </Modal>
     </>
   );
+}
+
+function formatEmphasisLabel(value: string): string {
+  return value.replace(/-/g, ' ');
 }
 
 function createStyles(colors: ReturnType<typeof useAppTheme>['colors']) {
@@ -101,6 +131,12 @@ function createStyles(colors: ReturnType<typeof useAppTheme>['colors']) {
     title: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '800' },
     subtitle: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 4, lineHeight: 18 },
     close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    contextPreview: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderDefault, backgroundColor: colors.surfaceSecondary, padding: spacing.md, marginBottom: spacing.sm, gap: 4 },
+    contextEyebrow: { color: colors.textTertiary, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+    contextLabel: { color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '800' },
+    contextLens: { color: colors.discovery, fontSize: fontSize.xs, fontWeight: '700' },
+    contextEmphasis: { color: colors.textSecondary, fontSize: fontSize.xs, lineHeight: 16 },
+    contextActions: { color: colors.textSecondary, fontSize: fontSize.xs, lineHeight: 16 },
     list: { gap: spacing.sm, paddingVertical: spacing.xs },
     worldRow: { minHeight: 68, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderDefault, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     iconBox: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
