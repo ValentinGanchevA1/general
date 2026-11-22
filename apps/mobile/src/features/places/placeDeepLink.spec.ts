@@ -19,6 +19,25 @@ describe('placeDeepLink', () => {
     expect(() => buildPlaceDeepLink('not-a-place')).toThrow('invalid place ID');
   });
 
+  it('uses an isolated QA scheme and never accepts Production place links in QA', () => {
+    const previous = process.env.NEXUS_WORLDS_QA;
+    process.env.NEXUS_WORLDS_QA = '1';
+    try {
+      jest.isolateModules(() => {
+        const qaLinks = require('./placeDeepLink') as typeof import('./placeDeepLink');
+        expect(qaLinks.buildPlaceDeepLink(PLACE_ID)).toBe(`nexa-qa://place/${PLACE_ID}`);
+        expect(qaLinks.parsePlaceDeepLink(`nexa-qa://place/${PLACE_ID}`)).toBe(PLACE_ID);
+        expect(qaLinks.parsePlaceDeepLink(`nexa://place/${PLACE_ID}`)).toBeNull();
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.NEXUS_WORLDS_QA;
+      } else {
+        process.env.NEXUS_WORLDS_QA = previous;
+      }
+    }
+  });
+
   it('parses exact place resources and ignores unrelated or malformed URLs', () => {
     expect(parsePlaceDeepLink(`nexa://place/${PLACE_ID}`)).toBe(PLACE_ID);
     expect(parsePlaceDeepLink(`nexa://place/${PLACE_ID}?source=share`)).toBe(PLACE_ID);
