@@ -29,7 +29,7 @@ function validatedBaseUrl(value) {
   const productionHosts = new Set(['g88-api.onrender.com', 'api.g88.app', 'g88.app', 'www.g88.app']);
   assert(!productionHosts.has(hostname) && !hostname.endsWith('.g88.app'),
     'Refusing to create test accounts or conversations against the Production API.');
-  assert(hostname !== 'localhost' && hostname !== '127.0.0.1' && !/^\\d{1,3}(?:\\.\\d{1,3}){3}$/.test(hostname),
+  assert(hostname !== 'localhost' && hostname !== '127.0.0.1' && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname),
     'DEVICE_E2E_BASE_URL must resolve through a dedicated non-production DNS hostname.');
   return parsed.origin;
 }
