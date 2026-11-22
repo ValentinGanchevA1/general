@@ -54,6 +54,10 @@ jobs:
       DATABASE_URL: postgresql://nexa_qa:${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/nexa_qa_bootstrap
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 17
       - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -83,6 +87,68 @@ jobs:
           apps/backend/scripts/db-target-attestation.test.cjs
           apps/backend/scripts/staging-target-preflight.test.cjs
           apps/backend/scripts/qa-empty-db-bootstrap.test.cjs
+      - name: Ensure Hermes compiler is runnable for Android package smoke build
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libz3-4
+          candidates=$(find node_modules -type f -name hermesc)
+          test -n "$candidates"
+          count=0
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q ELF; then
+              chmod +x "$candidate"
+              "$candidate" -version
+              count=$((count + 1))
+            fi
+          done <<< "$candidates"
+          test "$count" -gt 0
+      - name: Inject disposable Android QA package config
+        run: |
+          set -euo pipefail
+          cat >> apps/mobile/android/local.properties <<'EOF'
+          GOOGLE_MAPS_API_KEY_DEBUG=qa-ci-placeholder
+          GOOGLE_MAPS_API_KEY_RELEASE=qa-ci-placeholder
+          EOF
+          cat > apps/mobile/android/app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "100000000000",
+              "project_id": "nexus-worlds-qa-ci"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:100000000000:android:qa00000000000000",
+                "android_client_info": { "package_name": "com.g88.qa" }
+              },
+              "api_key": [{ "current_key": "qa-ci-placeholder" }]
+            }],
+            "configuration_version": "1"
+          }
+          JSON
+      - name: Compile isolated QA Release APK (no external credentials)
+        env:
+          API_HOST: worlds-qa-ci.invalid
+          NEXUS_WORLDS_QA: "1"
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }} -PnexusWorldsQaApplicationId=true
+      - name: Verify QA package and non-production debug signer
+        run: |
+          set -euo pipefail
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
+          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-1 digest:/ {print $2; exit}' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA1="$(keytool -list -v -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sed -n 's/.*SHA1: //p' | head -n1 | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          test -n "$APK_SHA1"
+          test "$APK_SHA1" = "$KEY_SHA1"
+          echo "Isolated QA APK package and debug signer verified."
+          echo "QA debug SHA-1 for Maps key restriction: $APK_SHA1"
       - name: Verify explicit Worlds QA gate and production fallback
         run: |
           set -euo pipefail
