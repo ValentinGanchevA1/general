@@ -159,7 +159,8 @@ android {
             manifestPlaceholders = [
                 GOOGLE_MAPS_API_KEY: localProperties.getProperty('GOOGLE_MAPS_API_KEY_RELEASE', ''),
                 usesCleartextTraffic: 'false',
-                nexaUriScheme: nexusWorldsQaApplicationId ? 'nexa-qa' : 'nexa'
+                nexaUriScheme: nexusWorldsQaApplicationId ? 'nexa-qa' : 'nexa',
+                appLabel: nexusWorldsQaApplicationId ? 'NEXUS QA' : 'NEXUS'
             ]
             // Use the upload key when configured (CI / release builds); fall back to
             // the debug key locally so `bundleRelease` smoke tests don't require secrets.
