@@ -29,6 +29,17 @@ test('rejects remote Supabase and Render targets before opening a connection', (
   );
 });
 
+test('rejects connection URI query and fragment overrides before connecting', () => {
+  assert.throws(
+    () => assertDisposableTarget('postgresql://nexa_qa:secret@127.0.0.1:5432/nexa_qa_bootstrap?host=prod-db.onrender.com'),
+    /Refusing non-disposable database target/,
+  );
+  assert.throws(
+    () => assertDisposableTarget('postgresql://nexa_qa:secret@127.0.0.1:5432/nexa_qa_bootstrap#remote-target'),
+    /Refusing non-disposable database target/,
+  );
+});
+
 test('rejects wrong database names, users, ports and protocols', () => {
   assert.throws(
     () => assertDisposableTarget('postgresql://nexa_qa:secret@127.0.0.1:5432/postgres'),
