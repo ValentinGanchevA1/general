@@ -35,6 +35,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.7
+        env:
+          POSTGRES_USER: nexa_qa
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: nexa_qa_bootstrap
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexa_qa -d nexa_qa_bootstrap"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://nexa_qa:${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/nexa_qa_bootstrap
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
@@ -44,6 +57,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Bootstrap current migrations on disposable PostgreSQL 17 + PostGIS
+        run: node apps/backend/scripts/qa-empty-db-bootstrap.cjs
       - name: Build shared
         run: pnpm --filter @g88/shared build
       - name: Mobile lint
@@ -63,6 +78,7 @@ jobs:
           apps/backend/scripts/migration-reconciliation-report.test.cjs
           apps/backend/scripts/db-target-attestation.test.cjs
           apps/backend/scripts/staging-target-preflight.test.cjs
+          apps/backend/scripts/qa-empty-db-bootstrap.test.cjs
       - name: Verify explicit Worlds QA gate and production fallback
         run: |
           set -euo pipefail
