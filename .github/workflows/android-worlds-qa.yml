@@ -11,6 +11,10 @@ on:
       - ".github/workflows/android-worlds-qa.yml"
       - "apps/mobile/src/config.ts"
       - "apps/mobile/src/features/worldModes/worldModes.ts"
+      - "apps/backend/migrations/**"
+      - "apps/backend/scripts/migrate.js"
+      - "apps/backend/scripts/qa-empty-db-bootstrap.cjs"
+      - "apps/backend/scripts/qa-empty-db-bootstrap.test.cjs"
   workflow_dispatch:
     inputs:
       api_host:
