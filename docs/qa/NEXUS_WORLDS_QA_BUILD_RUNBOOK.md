@@ -7,6 +7,7 @@ Provide a manually triggered, short-retention APK artifact for physical testing 
 - Supabase production project `G88`: ref `hmtwlkplyjbskljntdkl`, PostgreSQL 17.6; `public.schema_migrations` has 85 rows / 85 distinct filenames and the public schema has 66 base tables.
 - Supabase project `NEXUS-STAGING`: ref `dvpgvchvackudnjyosag`, PostgreSQL 17.12, ACTIVE_HEALTHY; public schema currently has 0 base tables and no `public.schema_migrations`.
 - Render workspace `g88`: `g88-api` is on `master`, auto-deploy is off, URL is the production `g88-api.onrender.com`; no staging API service or Render Postgres instance was listed.
+- Render workspace `g88` has only one Key Value instance, `g88-redis` (free plan, persistence off); no separate staging Redis exists. Do not reuse the production Redis for QA.
 - Therefore the staging DB project exists but has not been bootstrapped, and no staging API host is available/attested. Do not trigger the workflow yet.
 - Do not restore production user data into the staging project. Migration provenance/reconciliation and a separate staging API deployment are prerequisite gates.
 
@@ -37,7 +38,7 @@ Optional:
 - GitHub `workflow_dispatch` is also declared, but GitHub only exposes manual dispatch after the workflow file exists on the default branch. Until then, use the gated branch push path. See [GitHub's workflow event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
 
 ## Run — only after all infrastructure gates pass
-1. Confirm a reachable staging API service whose runtime `DATABASE_URL` targets the isolated project ref `dvpgvchvackudnjyosag`, and whose Redis/integrations are isolated.
+1. Confirm a reachable staging API service whose runtime `DATABASE_URL` targets the isolated project ref `dvpgvchvackudnjyosag`, and whose Redis/integrations are isolated. A separate staging Redis must be provisioned; never point QA at `g88-redis`.
 2. Confirm the staging database has the approved schema/migration baseline. The currently observed project is empty; do not run the app against it yet.
 3. Confirm non-production Firebase, Maps and MapTiler credentials are configured as the QA secrets above.
 4. Add repository Actions variable `NEXUS_WORLDS_QA_API_HOST` with the verified staging API hostname.
