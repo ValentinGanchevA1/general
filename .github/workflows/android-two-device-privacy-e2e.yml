@@ -75,7 +75,7 @@ jobs:
           GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
         run: |
           set -euo pipefail
-          node -e 'const h=(process.env.API_HOST||"").trim().toLowerCase(); const blocked=["g88-api.onrender.com","api.g88.app","g88.app","www.g88.app","localhost","127.0.0.1","10.0.2.2"]; const labels=h.split("."); const ip=labels.length===4 && labels.every(x=>/^\\d+$/.test(x)); if(!h || h.includes("://") || h.includes("/") || h.includes(":") || h.includes(" ") || blocked.includes(h) || h.endsWith(".g88.app") || ip || labels.length<2 || labels.some(x=>!x || x.length>63 || x.startsWith("-") || x.endsWith("-")) || !/^[a-z0-9.-]+$/.test(h)) { console.error("Rejected QA API host; provide a verified non-production bare DNS hostname."); process.exit(1); }'
+          node -e 'const h=(process.env.API_HOST||"").trim().toLowerCase(); const blocked=["g88-api.onrender.com","api.g88.app","g88.app","www.g88.app","localhost","127.0.0.1","10.0.2.2"]; const labels=h.split("."); const ip=labels.length===4 && labels.every(x=>/^\d+$/.test(x)); if(!h || h.includes("://") || h.includes("/") || h.includes(":") || h.includes(" ") || blocked.includes(h) || h.endsWith(".g88.app") || ip || labels.length<2 || labels.some(x=>!x || x.length>63 || x.startsWith("-") || x.endsWith("-")) || !/^[a-z0-9.-]+$/.test(h)) { console.error("Rejected QA API host; provide a verified non-production bare DNS hostname."); process.exit(1); }'
           test -n "$GOOGLE_MAPS_API_KEY_QA" || { echo "::error::GOOGLE_MAPS_API_KEY_QA is required"; exit 1; }
           test -n "$GOOGLE_SERVICES_JSON_QA" || { echo "::error::GOOGLE_SERVICES_JSON_QA is required"; exit 1; }
           echo "Dedicated QA API host and provider credentials validated."
