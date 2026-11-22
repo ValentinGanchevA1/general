@@ -146,10 +146,6 @@ jobs:
         env:
           GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
           GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
-          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
-          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           cat >> android/local.properties <<EOF
@@ -161,8 +157,6 @@ jobs:
       - name: Build QA APK (Release variant, QA flag only)
         env:
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID_QA }}
-          SENTRY_DIST: qa-${{ github.run_number }}
-          SENTRY_RELEASE: com.g88@qa-${{ github.run_number }}
           NEXUS_WORLDS_QA: "1"
           API_HOST: ${{ inputs.api_host || vars.NEXUS_WORLDS_QA_API_HOST || '' }}
         run: |
