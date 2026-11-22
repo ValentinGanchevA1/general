@@ -24,6 +24,8 @@ function assertDisposableTarget(raw) {
   const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
   if (
     !['postgres:', 'postgresql:'].includes(url.protocol) ||
+    url.search !== '' ||
+    url.hash !== '' ||
     !['127.0.0.1', 'localhost'].includes(url.hostname) ||
     (url.port || '5432') !== '5432' ||
     url.username !== 'nexa_qa' ||
