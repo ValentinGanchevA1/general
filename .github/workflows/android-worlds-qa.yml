@@ -30,8 +30,29 @@ env:
   NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
 
 jobs:
+  config-preflight:
+    name: Verify QA-only configuration and production isolation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify explicit Worlds QA gate and production fallback
+        run: |
+          set -euo pipefail
+          grep -Fq "export const WORLD_MODES_ENABLED = __DEV__ || process.env.NEXUS_WORLDS_QA === '1';" apps/mobile/src/features/worldModes/worldModes.ts
+          grep -Fq "const WORLDS_QA_MODE = process.env.NEXUS_WORLDS_QA === '1';" apps/mobile/src/config.ts
+          grep -Fq "API_BASE_URL: __DEV__ || WORLDS_QA_MODE" apps/mobile/src/config.ts
+          grep -Fq "'https://g88-api.onrender.com'" apps/mobile/src/config.ts
+          ! grep -Fq "secrets.GOOGLE_SERVICES_JSON }}" .github/workflows/android-worlds-qa.yml
+          ! grep -Fq "secrets.GOOGLE_MAPS_API_KEY_RELEASE }}" .github/workflows/android-worlds-qa.yml
+          ! grep -Fq "secrets.NEXA_MAPTILER_API_KEY }}" .github/workflows/android-worlds-qa.yml
+          ! grep -Fq "secrets.SENTRY_DSN }}" .github/workflows/android-worlds-qa.yml
+          echo "Worlds QA gate, production API fallback and QA-only provider secret boundaries verified."
+
   qa-apk:
     name: Worlds QA APK (non-production API)
+    needs: config-preflight
     if: ${{ (github.event_name == 'workflow_dispatch' && inputs.api_host != '') || vars.NEXUS_WORLDS_QA_API_HOST != '' }}
     runs-on: ubuntu-latest
     permissions:
