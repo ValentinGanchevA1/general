@@ -1,7 +1,7 @@
 name: Android Worlds QA APK
 
-# QA credentials are intentionally isolated from production Firebase, Maps,
-# MapTiler and Sentry. Configure the *_QA secrets before running this workflow.
+# QA credentials and Android package are isolated from Production. The QA APK
+# uses com.g88.qa, a separate data sandbox and the repository debug keystore.
 
 on:
   push:
@@ -97,7 +97,7 @@ jobs:
           echo "Worlds QA gate, production API fallback and QA-only provider secret boundaries verified."
 
   qa-apk:
-    name: Worlds QA APK (non-production API)
+    name: Worlds QA APK (isolated package / non-production API)
     needs: config-preflight
     if: ${{ (github.event_name == 'workflow_dispatch' && inputs.api_host != '') || vars.NEXUS_WORLDS_QA_API_HOST != '' }}
     runs-on: ubuntu-latest
@@ -121,14 +121,10 @@ jobs:
         env:
           GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
           GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
-          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
-          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           node -e 'const h=process.env.API_HOST.trim().toLowerCase(); const forbidden=["api.g88.app","g88-api.onrender.com","localhost","127.0.0.1","10.0.2.2"]; const labels=h.split("."); const ip=labels.length===4 && labels.every(x=>/^[0-9]+$/.test(x)); if(!h || h.includes("://") || h.includes("/") || h.includes(" ") || forbidden.some(x=>h.includes(x)) || ip || labels.length<2 || labels.some(x=>!x || x.length>63 || x.startsWith("-") || x.endsWith("-")) || !/^[a-z0-9.-]+$/.test(h)) { console.error("Rejected API_HOST: provide a bare, reachable non-production DNS hostname (no scheme/path/IP)."); process.exit(1); }'
-          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_QA GOOGLE_SERVICES_JSON_QA ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_QA GOOGLE_SERVICES_JSON_QA; do
             if [ -z "${!name:-}" ]; then echo "::error::Required secret $name is missing"; exit 1; fi
           done
           echo "QA host and required secrets validated."
@@ -159,14 +155,9 @@ jobs:
           cat >> android/local.properties <<EOF
           GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_QA}
           GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_QA}
-          RELEASE_STORE_FILE=app/upload.keystore
-          RELEASE_STORE_PASSWORD=${ANDROID_UPLOAD_STORE_PASSWORD}
-          RELEASE_KEY_ALIAS=${ANDROID_UPLOAD_KEY_ALIAS}
-          RELEASE_KEY_PASSWORD=${ANDROID_UPLOAD_KEY_PASSWORD}
           EOF
           echo "$GOOGLE_SERVICES_JSON_QA" | base64 -d > android/app/google-services.json
-          node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync("android/app/google-services.json","utf8")); const clients=j.client||[]; if(!clients.some(c=>c.client_info?.android_client_info?.package_name==="com.g88")) { console.error("QA google-services.json has no com.g88 Android client"); process.exit(1); }'
-          echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload.keystore
+          node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync("android/app/google-services.json","utf8")); const clients=j.client||[]; if(!clients.some(c=>c.client_info?.android_client_info?.package_name==="com.g88.qa")) { console.error("QA google-services.json has no com.g88.qa Android client"); process.exit(1); }'
       - name: Build QA APK (Release variant, QA flag only)
         env:
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID_QA }}
@@ -176,11 +167,35 @@ jobs:
           API_HOST: ${{ inputs.api_host || vars.NEXUS_WORLDS_QA_API_HOST || '' }}
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }}
-      - name: Verify APK exists
+          ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }} -PnexusWorldsQaApplicationId=true
+      - name: Verify QA APK identity and signing
         run: |
+          set -euo pipefail
           APK=android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
+
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
+          if printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88' "; then
+            echo "::error::QA APK unexpectedly uses the Production applicationId"
+            exit 1
+          fi
+
+          "$APKSIGNER" verify --verbose "$APK"
+          APK_SHA1="$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-1 digest:/ {print $2; exit}' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA1="$(keytool -list -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sed -n 's/.*SHA1: //p' | head -n1 | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          test -n "$APK_SHA1"
+          test -n "$KEY_SHA1"
+          test "$APK_SHA1" = "$KEY_SHA1"
+
+          echo "QA applicationId: com.g88.qa"
+          echo "QA deep link scheme: nexa-qa"
+          echo "Non-production debug signing SHA-1 for GOOGLE_MAPS_API_KEY_QA restriction: $APK_SHA1"
           sha256sum "$APK"
       - name: Upload QA APK artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
