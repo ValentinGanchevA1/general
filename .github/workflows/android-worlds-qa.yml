@@ -1,5 +1,8 @@
 name: Android Worlds QA APK
 
+# QA credentials are intentionally isolated from production Firebase, Maps,
+# MapTiler and Sentry. Configure the *_QA secrets before running this workflow.
+
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +18,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   NEXUS_WORLDS_QA: "1"
   API_HOST: ${{ inputs.api_host }}
-  NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY }}
+  NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY_QA }}
   NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
   NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
 
@@ -41,9 +44,9 @@ jobs:
           cache: pnpm
       - name: Validate QA host and secrets
         env:
-          GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
-          GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
@@ -51,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           node -e 'const h=process.env.API_HOST.trim(); const forbidden=["api.g88.app","g88-api.onrender.com","localhost","127.0.0.1","10.0.2.2"]; if(!h || h.includes("://") || h.includes("/") || h.includes(" ") || forbidden.some(x=>h.toLowerCase().includes(x)) || !/^[a-z0-9.-]+$/i.test(h)) { console.error("Rejected API_HOST: provide a bare, reachable non-production hostname (no scheme/path)."); process.exit(1); }'
-          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_DEBUG GOOGLE_MAPS_API_KEY_RELEASE GOOGLE_SERVICES_JSON ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_QA GOOGLE_SERVICES_JSON_QA ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then echo "::error::Required secret $name is missing"; exit 1; fi
           done
           echo "QA host and required secrets validated."
@@ -81,19 +84,18 @@ jobs:
         run: |
           set -euo pipefail
           cat >> android/local.properties <<EOF
-          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_DEBUG}
-          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_RELEASE}
+          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_QA}
+          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_QA}
           RELEASE_STORE_FILE=app/upload.keystore
           RELEASE_STORE_PASSWORD=${ANDROID_UPLOAD_STORE_PASSWORD}
           RELEASE_KEY_ALIAS=${ANDROID_UPLOAD_KEY_ALIAS}
           RELEASE_KEY_PASSWORD=${ANDROID_UPLOAD_KEY_PASSWORD}
           EOF
-          echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          echo "$GOOGLE_SERVICES_JSON_QA" | base64 -d > android/app/google-services.json
           echo "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 -d > android/app/upload.keystore
       - name: Build QA APK (Release variant, QA flag only)
         env:
-          GOOGLE_WEB_CLIENT_ID: 689098029576-r7hoijre01nvocb25elp2q0ufb5v0geu.apps.googleusercontent.com
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID_QA }}
           SENTRY_DIST: qa-${{ github.run_number }}
           SENTRY_RELEASE: com.g88@qa-${{ github.run_number }}
           NEXUS_WORLDS_QA: "1"
