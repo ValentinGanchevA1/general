@@ -38,7 +38,7 @@ Provide an isolated, short-retention APK artifact for physical testing of the Wo
 - The same run passed Mobile Jest (**138 suites / 733 tests**), lint, typecheck, MapLibre/legal gates and offline DB/provenance checks (**26 subtests, 0 failures**).
 - This is evidence that the **current 70-file source-controlled baseline can build a fresh PostgreSQL 17 schema**. It does not prove Production equivalence, apply the 15 historical Production tracker names, populate the actual `NEXUS-STAGING` project, verify the Render runtime credentials, or certify API-level auth/discovery. No Production or Supabase staging state was mutated by the CI job.
 
-## Required GitHub Actions secrets
+## Required GitHub Actions configuration
 Configure these on the repository before running the workflow:
 - `NEXA_MAPTILER_API_KEY_QA`
 - `GOOGLE_MAPS_API_KEY_QA` — restrict to package `com.g88.qa`, the repository debug-keystore SHA-1 printed by the workflow, and only the required Maps APIs.
