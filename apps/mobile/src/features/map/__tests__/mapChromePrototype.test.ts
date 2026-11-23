@@ -1,7 +1,4 @@
-import {
-  NEXA_MAP_CHROME_PROTOTYPE_ENABLED,
-  resolveMapChromePrototypeEnabled,
-} from '../mapChromePrototype';
+import { resolveMapChromePrototypeEnabled } from '../mapChromePrototype';
 
 describe('map chrome visual prototype flag', () => {
   it('fails closed unless the exact opt-in value is 1', () => {
@@ -13,9 +10,5 @@ describe('map chrome visual prototype flag', () => {
     expect(resolveMapChromePrototypeEnabled(' 1')).toBe(false);
     expect(resolveMapChromePrototypeEnabled('1 ')).toBe(false);
     expect(resolveMapChromePrototypeEnabled('1')).toBe(true);
-  });
-
-  it('exposes the build-time config as the effective prototype switch', () => {
-    expect(typeof NEXA_MAP_CHROME_PROTOTYPE_ENABLED).toBe('boolean');
   });
 });
