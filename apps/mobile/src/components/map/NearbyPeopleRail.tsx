@@ -88,6 +88,7 @@ export function NearbyPeopleRail({
 				styles.wrap,
 				{
 					borderColor: colors.borderStrong,
+					backgroundColor: colors.surfacePrimary,
 					shadowColor: colors.shadowInk,
 				},
 			]}
