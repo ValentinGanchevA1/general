@@ -33,9 +33,17 @@ Prototype a visual refinement of the existing map surface. Do not introduce a se
 - No production enablement of World Modes.
 - No change to release-critical RC2 behavior.
 
+## Feature flag and rollback
+
+- Build-time opt-in: `NEXA_MAP_CHROME_PROTOTYPE=1` in `apps/mobile/.env` or the mobile build environment.
+- The exact value `1` enables only the local styling refinements in `MapFilterRow` and `NearbyPeopleRail`.
+- Unset the variable or set it to `0` to restore the current styling. Restart Metro with a cache reset or rebuild the app so the inlined environment value is refreshed.
+- Default is disabled. Do not enable this flag in release builds until physical-device QA and review are recorded.
+- This is a build-time flag, not a remote kill switch; rollback requires a new bundle/build.
+
 ## Implementation gate
 
-Before code changes, inspect the full current composition and theme primitives, confirm the flag/rollback mechanism, and identify the smallest component-level styling change. Prefer reuse of existing theme tokens over adding a new global palette.
+The existing composition and theme primitives were inspected. The prototype is scoped to the existing `MapFilterRow` and `NearbyPeopleRail`, with existing theme aliases. No new map, query lifecycle, state slice or navigation model was added.
 
 ## QA / regression checklist
 
@@ -47,7 +55,8 @@ Before code changes, inspect the full current composition and theme primitives, 
 - [ ] Reduced-motion behavior is respected.
 - [ ] Small-screen and safe-area layout checked.
 - [ ] Android device QA documented (Huawei Nova 11 is one target device).
-- [ ] Feature flag/rollback path verified.
+- [x] Build-time feature flag is fail-closed by default; rollback procedure documented.
+- [ ] Verify the flag on/off on a physical Android device.
 - [ ] CI and relevant tests pass.
 
 ## Design tokens (prototype-local only)
@@ -71,8 +80,9 @@ These values are design references; prefer existing theme aliases if equivalent.
 ## Prototype progress
 
 - [x] First isolated styling pass applied to `MapFilterRow.tsx`: slightly improved search field spacing, entity-layer chip spacing and typography, and press feedback.
-- [x] Nearby People rail now uses the current theme surface color for its panel, instead of always overriding it with a fixed translucent black.
-- [ ] Run mobile typecheck, component tests and Android visual QA before treating this as validated.
+- [x] Nearby People rail uses the elevated theme surface and subtle border when the prototype flag is enabled; the original translucent styling remains the default when disabled.
+- [ ] Run the focused mobile typecheck/tests with the prototype flag both disabled and enabled.
+- [ ] Run Android visual QA on Huawei Nova 11 before rollout.
 - [ ] Review on small-screen layouts and dynamic font scaling.
 
-This pass does not change discovery queries, map/lens state, navigation, backend, permissions or release behavior.
+This pass does not change discovery queries, map/lens state, navigation, backend or permissions. The prototype is disabled by default and must not be enabled in a release build before QA.
