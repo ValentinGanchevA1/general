@@ -66,3 +66,12 @@ Before code changes, inspect the full current composition and theme primitives, 
 - Muted text: `#78849F`
 
 These values are design references; prefer existing theme aliases if equivalent.
+
+
+## Prototype progress
+
+- [x] First isolated styling pass applied to `MapFilterRow.tsx`: slightly improved search field spacing, entity-layer chip spacing and typography, and press feedback.
+- [ ] Run mobile typecheck, component tests and Android visual QA before treating this as validated.
+- [ ] Review on small-screen layouts and dynamic font scaling.
+
+This pass does not change discovery queries, map/lens state, navigation, backend, permissions or release behavior.
