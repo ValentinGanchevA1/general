@@ -52,7 +52,7 @@ jobs:
       # macOS runner defaults. The pnpm/CocoaPods null-byte bug is still
       # intermittent across Ruby/CocoaPods versions, so the install step below
       # retries only that exact known transient failure.
-      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1
         with:
           ruby-version: '3.3.3'
 
