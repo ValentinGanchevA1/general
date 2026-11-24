@@ -3,7 +3,7 @@
 > **Authoritative source for sequence and gates.**  
 > Sibling docs: `PRODUCT.md` (what/why), `SPECIFICATION.md` (contracts), `ARCHITECTURE.md` (how), `docs/STATUS_CURRENT.md` (live progress).  
 > **Compatibility note:** public product identity is **NEXUS**. Technical identifiers such as `@g88/*`, `com.g88`, storage keys, legacy infrastructure hostnames, release artifact names, and signing metadata remain unchanged unless an explicit migration says otherwise.  
-> Last reconciled: **2026-11-10**.
+> Last reconciled: **2026-11-24**.
 
 ---
 
@@ -46,7 +46,7 @@ Production sign-off remains gated by:
 
 1. **#580 physical Android release audit** — real-device installation, visual/interaction/privacy/accessibility smoke.
 2. **#669 launch calibration** — physical-device recording + telemetry before changing launch timing constants.
-3. **#592 dedicated NEXUS Terms of Service** — legal-reviewed content + separate public `/terms` URL.
+3. **#592 dedicated NEXUS Terms of Service** — still open. Publication only via `docs/legal-review/` candidate + `NEXUS_TERMS_APPROVAL.json` + `prepare-approved-terms.mjs` → reviewed PR → Render `g88-legal`. Process documented; no public `/terms` until sign-off. Linked: #1067 (acceptance), #1068 (Social 18+), #1071 (child-safety evidence). Closed testing may continue; production NO-GO.
 4. **#616 Play Store visual set** — final screenshot capture after physical-device sign-off.
 
 Do not collapse those external/product/legal gates into "engineering done."
@@ -145,7 +145,7 @@ Do not introduce these because they are fashionable; require a measured product/
 
 | ID | Risk | Mitigation / gate |
 |---|---|---|
-| R-Legal | Terms label does not yet have final reviewed dedicated Terms document | #592 blocks production sign-off; do not invent legal language |
+| R-Legal | Dedicated `/terms` not published; TERMS still routes to Privacy | #592 open — formal `docs/legal-review/` + prepare-approved-terms path only; live `/terms` 404 until counsel + owner approval; do not invent or deploy unapproved HTML |
 | R-Device | CI/simulator evidence cannot prove final device ergonomics, launch feel or provider behavior | #580 + #669 plus MapLibre physical-device canary evidence; include group-chat smoke on RC |
 | R-MapRollout | Merged MapLibre/runtime/kill-switch code could be mistaken for production activation | keep `legacy` default; require operational policy proof + manual provider/device evidence + separate activation PR |
 | R-WebRelease | Browser foundation mistaken for production-ready web product | final hosting/browser/provider/deployed-E2E gates remain explicit |
@@ -157,6 +157,7 @@ Do not introduce these because they are fashionable; require a measured product/
 
 ## Changelog
 
+- **2026-11-24** — #592 status truth: formal legal-review publication path documented; public `/terms` remains 404 until counsel-approved candidate + approval manifest + prepare script → reviewed PR. Does not close #592.
 - **2026-11-10** — Reconciled **P4.G group chat to ✅ shipped** from master code and merged PRs (#931 create/list, #936 realtime, #938 mobile activation, #940 member management; security follow-ups #1020/#1034/#1035). Split live streaming / paid gifts from group chat in PRODUCT pillars. Updated P4+ snapshot. Residual: device smoke + Render migration apply confirmation.
 - **2026-10-27** — Reconciled merged login/recovery, event reviews and migration recovery, Profile v3 and splash changes in `docs/STATUS_CURRENT.md`. #828/#829 remain open. RC3 does not certify newer features; a later candidate requires an exact commit/artifact and fresh device checks. Preserved legal, device, web and renderer gates; strengthened PostHog gating with #815.
 - **2026-10-26** — Reconciled roadmap to current NEXUS master: migrations `0001–0050` / next `0051`; web foundation remains a gated public-release track; iOS native compile/launch and MapLibre runtime-router CI gates are green; real-provider iOS/Android canary workflows and remote renderer kill-switch are merged; remaining activation work is operational policy proof + physical-device/provider evidence + a separate production opt-in. Backend-only privacy-safe PostHog mirroring is also merged behind explicit enablement.

@@ -1,6 +1,6 @@
 # NEXUS — current status
 
-> **Synced:** 2026-11-10  
+> **Synced:** 2026-11-24  
 > **Verified source baseline:** `master` at `38687e9815f6c0ba97e809d837e2d02e6cf432d7` (includes docs/play child-safety draft #1076 and prior group-chat work). Merged code is not evidence of deployed backend state or physical-device sign-off.  
 > **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Group-chat related migrations on disk include **0038**, **0066**, **0067**. Earlier recovery 0051 / reviews 0052 / occupation 0053 remain merged historically; deployment application is not verified by this snapshot.  
 > Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.  
@@ -127,7 +127,7 @@ Do not treat an old PR-scoped preview as authoritative production evidence.
 
 | Gate | State | Why it remains open |
 |---|---|---|
-| **#592 — dedicated NEXUS Terms of Service** | 🔴 P1 | Requires legal-reviewed Terms content and a dedicated public `/terms` document. Do not invent final legal language. |
+| **#592 — dedicated NEXUS Terms of Service** | 🔴 open (P1) | Formal path in `docs/legal-review/` (draft 2026-11-07, counsel handoff 2026-11-19, PUBLICATION_GUIDE, `scripts/legal/prepare-approved-terms.mjs`). Public `/terms` must stay unpublished until counsel + owner approval + `NEXUS_TERMS_APPROVAL.json` + prepare `--write` via reviewed PR. Live `g88-legal` `/terms` = **404** (correct). `TERMS_OF_SERVICE_URL` still equals Privacy until approved. PR #1067 acceptance needs approved URL. Do not invent or deploy final legal language. |
 | **#580 — physical Android release audit** | 🟡 external/device | Requires RC installation and focused QA on a real Android device, including Friends/429, privacy, accessibility, visual/interaction checks, and **group chat** smoke. |
 | **#669 — launch calibration** | 🟡 external/device | Requires physical-device recordings + telemetry before changing launch timing constants. |
 | **#616 — Play Store visual set** | 🟡 sequenced | Final screenshots follow physical-device sign-off; live UI evidence must come from an approved audited RC/device capture. |
@@ -163,7 +163,7 @@ Conversation refresh diagnostics (#805) use the same privacy principle: fixed cl
 ## 7. Current priorities
 
 1. **Physical-device release QA** — complete #580 and #669 without changing launch constants from subjective feel alone; include group create/send/leave/kick.
-2. **Legal production gate** — obtain reviewed Terms for #592 and wire a dedicated `/terms` URL.
+2. **Legal production gate (#592)** — keep public `/terms` 404 until counsel-approved candidate HTML + approval manifest + prepare script write via reviewed PR → Render. Then wire `TERMS_OF_SERVICE_URL`, CI `NEXUS_TERMS_VERSION` / `NEXUS_TERMS_SHA256`, migration 0072, and device acceptance QA before `NEXUS_REQUIRE_UGC_TERMS`.
 3. **Controlled MapLibre rollout evidence** — complete live remote-policy proof, manual provider canaries and physical-device validation before any production opt-in.
 4. **Play Store visuals** — finish #616 only after the approved device baseline has no open P0/P1 release blocker.
 5. **Web production topology** — choose final hostname/edge policy + production tile stack and run deployed HTTPS validation against the final topology.
