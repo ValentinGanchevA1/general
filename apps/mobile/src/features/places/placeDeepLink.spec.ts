@@ -1,5 +1,6 @@
 import {
   buildPlaceDeepLink,
+  createPlaceDeepLinkCodec,
   parsePlaceDeepLink,
   placeDeepLinkQueue,
 } from './placeDeepLink';
@@ -17,6 +18,18 @@ describe('placeDeepLink', () => {
 
   it('rejects invalid ids when building links', () => {
     expect(() => buildPlaceDeepLink('not-a-place')).toThrow('invalid place ID');
+  });
+
+  it('uses an isolated QA scheme and never accepts Production place links in QA', () => {
+    const qaLinks = createPlaceDeepLinkCodec('nexa-qa');
+    const productionLinks = createPlaceDeepLinkCodec('nexa');
+
+    expect(qaLinks.build(PLACE_ID)).toBe(`nexa-qa://place/${PLACE_ID}`);
+    expect(qaLinks.parse(`nexa-qa://place/${PLACE_ID}`)).toBe(PLACE_ID);
+    expect(qaLinks.parse(`nexa://place/${PLACE_ID}`)).toBeNull();
+
+    expect(productionLinks.build(PLACE_ID)).toBe(`nexa://place/${PLACE_ID}`);
+    expect(productionLinks.parse(`nexa-qa://place/${PLACE_ID}`)).toBeNull();
   });
 
   it('parses exact place resources and ignores unrelated or malformed URLs', () => {

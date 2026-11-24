@@ -34,8 +34,10 @@ const DEV_API_URL = isLocalDevHost(DEV_HOST)
   ? `http://${DEV_HOST}:3001`
   : `https://${DEV_HOST}`;
 
+const WORLDS_QA_MODE = process.env.NEXUS_WORLDS_QA === '1';
+
 export const Config = {
-  API_BASE_URL: __DEV__
+  API_BASE_URL: __DEV__ || WORLDS_QA_MODE
     ? DEV_API_URL
     : 'https://g88-api.onrender.com',
   // OAuth 2.0 Web Client ID from Google Cloud Console (same value used by backend GOOGLE_CLIENT_ID)

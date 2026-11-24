@@ -1,0 +1,321 @@
+name: Android Worlds QA APK
+
+# QA credentials and Android package are isolated from Production. The QA APK
+# uses com.g88.qa, a separate data sandbox and the repository debug keystore.
+
+on:
+  push:
+    branches:
+      - feat/worlds-qa-apk-master-clean-20261122
+    paths:
+      - ".github/workflows/android-worlds-qa.yml"
+      - "apps/mobile/src/config.ts"
+      - "apps/mobile/src/features/worldModes/worldModes.ts"
+      - "apps/mobile/src/features/places/placeDeepLink.ts"
+      - "apps/mobile/src/features/places/placeDeepLink.spec.ts"
+      - "apps/mobile/android/app/build.gradle"
+      - "apps/mobile/android/app/src/main/AndroidManifest.xml"
+      - "apps/backend/migrations/**"
+      - "apps/backend/scripts/migrate.js"
+      - "apps/backend/scripts/qa-empty-db-bootstrap.cjs"
+      - "apps/backend/scripts/qa-empty-db-bootstrap.test.cjs"
+  workflow_dispatch:
+    inputs:
+      api_host:
+        description: "Non-production API host for QA (required; production is blocked)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  API_HOST: ${{ inputs.api_host || vars.NEXUS_WORLDS_QA_API_HOST || '' }}
+  NEXA_MAPTILER_API_KEY: ${{ secrets.NEXA_MAPTILER_API_KEY_QA }}
+  NEXA_MAPTILER_MAP_ID: ${{ vars.NEXA_MAPTILER_MAP_ID || 'streets-v4' }}
+  NEXA_MAPTILER_REGION: ${{ vars.NEXA_MAPTILER_REGION || 'eu' }}
+
+jobs:
+  config-preflight:
+    name: Mobile CI and offline DB safety preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.7
+        env:
+          POSTGRES_USER: nexa_qa
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: nexa_qa_bootstrap
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexa_qa -d nexa_qa_bootstrap"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://nexa_qa:${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/nexa_qa_bootstrap
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Bootstrap current migrations on disposable PostgreSQL 17 + PostGIS
+        run: node apps/backend/scripts/qa-empty-db-bootstrap.cjs
+      - name: Build shared
+        run: pnpm --filter @g88/shared build
+      - name: Mobile lint
+        run: pnpm --filter @g88/mobile exec eslint src --ext .ts,.tsx --max-warnings 0
+      - name: Mobile typecheck
+        run: pnpm --filter @g88/mobile typecheck
+      - name: MapLibre release config gate
+        run: node --test apps/mobile/scripts/maplibre-release-config.test.mjs
+      - name: Legal URL and publication gates
+        run: node --test apps/mobile/scripts/legal-url-gate.test.mjs apps/mobile/scripts/legal-publication-gate.test.mjs
+      - name: Mobile Jest
+        run: pnpm --filter @g88/mobile exec jest --ci
+      - name: Offline migration provenance and staging safety tests
+        run: >-
+          node --test
+          apps/backend/scripts/migration-source-candidates.test.cjs
+          apps/backend/scripts/migration-reconciliation-report.test.cjs
+          apps/backend/scripts/db-target-attestation.test.cjs
+          apps/backend/scripts/staging-target-preflight.test.cjs
+          apps/backend/scripts/qa-empty-db-bootstrap.test.cjs
+      - name: Ensure Hermes compiler is runnable for Android package smoke build
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libz3-4
+          candidates=$(find node_modules -type f -name hermesc)
+          test -n "$candidates"
+          count=0
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q ELF; then
+              chmod +x "$candidate"
+              "$candidate" -version
+              count=$((count + 1))
+            fi
+          done <<< "$candidates"
+          test "$count" -gt 0
+      - name: Inject disposable Android QA package config
+        run: |
+          set -euo pipefail
+          cat >> apps/mobile/android/local.properties <<'EOF'
+          GOOGLE_MAPS_API_KEY_DEBUG=qa-ci-placeholder
+          GOOGLE_MAPS_API_KEY_RELEASE=qa-ci-placeholder
+          EOF
+          cat > apps/mobile/android/app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "100000000000",
+              "project_id": "nexus-worlds-qa-ci"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:100000000000:android:qa00000000000000",
+                "android_client_info": { "package_name": "com.g88.qa" }
+              },
+              "api_key": [{ "current_key": "qa-ci-placeholder" }]
+            }],
+            "configuration_version": "1"
+          }
+          JSON
+      - name: Compile isolated QA Release APK (no external credentials)
+        env:
+          API_HOST: worlds-qa-ci.invalid
+          NEXUS_WORLDS_QA: "1"
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }} -PnexusWorldsQaApplicationId=true
+      - name: Verify QA package and non-production debug signer
+        run: |
+          set -euo pipefail
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
+          CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
+          SHA256_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-256 digest:' || true)"
+          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA256="$(keytool -exportcert -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
+          KEY_CERT_DETAILS="$(LC_ALL=C keytool -list -v -keystore apps/mobile/android/app/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null)"
+          KEY_SHA1_LINE="$(printf '%s\n' "$KEY_CERT_DETAILS" | grep -i -m1 '^[[:space:]]*SHA1:' || true)"
+          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          if [ "${#APK_SHA256}" -ne 64 ] || [[ "$APK_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not extract a valid SHA-256 certificate digest from apksigner output."
+            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-256 digest' || true
+            exit 1
+          fi
+          if [ "${#KEY_SHA256}" -ne 64 ] || [[ "$KEY_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not calculate a valid SHA-256 certificate digest from the QA debug keystore."
+            exit 1
+          fi
+          if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not read a valid SHA-1 fingerprint from the QA debug keystore."
+            exit 1
+          fi
+          if [ "$APK_SHA256" != "$KEY_SHA256" ]; then
+            echo "::error::QA APK signer fingerprint does not match the repository debug keystore."
+            echo "APK signer SHA-256: $APK_SHA256"
+            echo "Expected debug-key SHA-256: $KEY_SHA256"
+            exit 1
+          fi
+          KEY_SHA1_PRETTY="$(printf '%s' "$KEY_SHA1" | sed -E 's/(..)/\1:/g; s/:$//' | tr '[:lower:]' '[:upper:]')"
+          echo "Isolated QA APK package and debug signer verified."
+          echo "QA debug SHA-1 for Maps key restriction: $KEY_SHA1_PRETTY"
+      - name: Verify explicit Worlds QA gate and production fallback
+        run: |
+          set -euo pipefail
+          grep -Fq "export const WORLD_MODES_ENABLED = __DEV__ || process.env.NEXUS_WORLDS_QA === '1';" apps/mobile/src/features/worldModes/worldModes.ts
+          grep -Fq "const WORLDS_QA_MODE = process.env.NEXUS_WORLDS_QA === '1';" apps/mobile/src/config.ts
+          grep -Fq "API_BASE_URL: __DEV__ || WORLDS_QA_MODE" apps/mobile/src/config.ts
+          grep -Fq "'https://g88-api.onrender.com'" apps/mobile/src/config.ts
+          grep -Fq 'secrets.GOOGLE_SERVICES_JSON_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'secrets.GOOGLE_MAPS_API_KEY_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'secrets.NEXA_MAPTILER_API_KEY_QA' .github/workflows/android-worlds-qa.yml
+          grep -Fq 'applicationId(nexusWorldsQaApplicationId ? "com.g88.qa" : "com.g88")' apps/mobile/android/app/build.gradle
+          grep -Fq 'android:scheme="${nexaUriScheme}"' apps/mobile/android/app/src/main/AndroidManifest.xml
+          grep -Fq 'signingConfig (nexusWorldsQaApplicationId ? signingConfigs.debug : (hasReleaseSigning ? signingConfigs.release : signingConfigs.debug))' apps/mobile/android/app/build.gradle
+          for forbidden in GOOGLE_SERVICES_JSON GOOGLE_MAPS_API_KEY_RELEASE NEXA_MAPTILER_API_KEY SENTRY_DSN ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_STORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD; do
+            if grep -Eq "secrets\\.${forbidden}[[:space:]]*}}" .github/workflows/android-worlds-qa.yml; then
+              echo "::error::Production credential reference found for ${forbidden}"
+              exit 1
+            fi
+          done
+          echo "Worlds QA gate, QA applicationId/data sandbox, QA deep-link scheme, debug signing and provider-secret boundaries verified."
+
+  qa-apk:
+    name: Worlds QA APK (isolated package / non-production API)
+    needs: config-preflight
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.api_host != '') || vars.NEXUS_WORLDS_QA_API_HOST != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: pnpm/action-setup@5eea8caf49c844361c1e9ddc1324e179c54b58e9 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Validate QA host and secrets
+        env:
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
+        run: |
+          set -euo pipefail
+          node -e 'const h=process.env.API_HOST.trim().toLowerCase(); const forbidden=["api.g88.app","g88-api.onrender.com","localhost","127.0.0.1","10.0.2.2"]; const labels=h.split("."); const ip=labels.length===4 && labels.every(x=>/^[0-9]+$/.test(x)); if(!h || h.includes("://") || h.includes("/") || h.includes(" ") || forbidden.some(x=>h.includes(x)) || ip || labels.length<2 || labels.some(x=>!x || x.length>63 || x.startsWith("-") || x.endsWith("-")) || !/^[a-z0-9.-]+$/.test(h)) { console.error("Rejected API_HOST: provide a bare, reachable non-production DNS hostname (no scheme/path/IP)."); process.exit(1); }'
+          for name in NEXA_MAPTILER_API_KEY GOOGLE_MAPS_API_KEY_QA GOOGLE_SERVICES_JSON_QA; do
+            if [ -z "${!name:-}" ]; then echo "::error::Required secret $name is missing"; exit 1; fi
+          done
+          echo "QA host and required secrets validated."
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Ensure Hermes compiler binaries are runnable
+        working-directory: .
+        run: |
+          sudo apt-get update && sudo apt-get install -y libz3-4
+          candidates=$(find node_modules -type f -name hermesc)
+          test -n "$candidates"
+          count=0
+          while IFS= read -r candidate; do
+            if file "$candidate" | grep -q ELF; then chmod +x "$candidate"; "$candidate" -version; count=$((count+1)); fi
+          done <<< "$candidates"
+          test "$count" -gt 0
+      - name: Inject Android config
+        env:
+          GOOGLE_MAPS_API_KEY_QA: ${{ secrets.GOOGLE_MAPS_API_KEY_QA }}
+          GOOGLE_SERVICES_JSON_QA: ${{ secrets.GOOGLE_SERVICES_JSON_QA }}
+        run: |
+          set -euo pipefail
+          cat >> android/local.properties <<EOF
+          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_QA}
+          GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_QA}
+          EOF
+          echo "$GOOGLE_SERVICES_JSON_QA" | base64 -d > android/app/google-services.json
+          node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync("android/app/google-services.json","utf8")); const clients=j.client||[]; if(!clients.some(c=>c.client_info?.android_client_info?.package_name==="com.g88.qa")) { console.error("QA google-services.json has no com.g88.qa Android client"); process.exit(1); }'
+      - name: Build QA APK (Release variant, QA flag only)
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID_QA }}
+          NEXUS_WORLDS_QA: "1"
+          API_HOST: ${{ inputs.api_host || vars.NEXUS_WORLDS_QA_API_HOST || '' }}
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --init-script ci-init.gradle -PversionCodeOverride=${{ github.run_number }} -PnexusWorldsQaApplicationId=true
+      - name: Verify QA APK identity and signing
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT"
+          test -x "$APKSIGNER"
+
+          BADGING="$("$AAPT" dump badging "$APK")"
+          printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88.qa' "
+          if printf '%s\n' "$BADGING" | grep -Fq "package: name='com.g88' "; then
+            echo "::error::QA APK unexpectedly uses the Production applicationId"
+            exit 1
+          fi
+
+          "$APKSIGNER" verify --verbose "$APK"
+          CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)"
+          SHA256_LINE="$(printf '%s\n' "$CERT_OUTPUT" | grep -i -m1 'sha-256 digest:' || true)"
+          APK_SHA256="$(printf '%s\n' "$SHA256_LINE" | sed -E 's/^.*sha-256 digest:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          KEY_SHA256="$(keytool -exportcert -keystore android/app/debug.keystore -storepass android -alias androiddebugkey | sha256sum | awk '{print $1}' | tr '[:upper:]' '[:lower:]')"
+          KEY_CERT_DETAILS="$(LC_ALL=C keytool -list -v -keystore android/app/debug.keystore -storepass android -alias androiddebugkey 2>/dev/null)"
+          KEY_SHA1_LINE="$(printf '%s\n' "$KEY_CERT_DETAILS" | grep -i -m1 '^[[:space:]]*SHA1:' || true)"
+          KEY_SHA1="$(printf '%s\n' "$KEY_SHA1_LINE" | sed -E 's/^[[:space:]]*SHA1:[[:space:]]*//I' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          if [ "${#APK_SHA256}" -ne 64 ] || [[ "$APK_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not extract a valid SHA-256 certificate digest from apksigner output."
+            printf '%s\n' "$CERT_OUTPUT" | grep -i 'sha-256 digest' || true
+            exit 1
+          fi
+          if [ "${#KEY_SHA256}" -ne 64 ] || [[ "$KEY_SHA256" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not calculate a valid SHA-256 certificate digest from the QA debug keystore."
+            exit 1
+          fi
+          if [ "${#KEY_SHA1}" -ne 40 ] || [[ "$KEY_SHA1" == *[!0-9a-f]* ]]; then
+            echo "::error::Could not read a valid SHA-1 fingerprint from the QA debug keystore."
+            exit 1
+          fi
+          if [ "$APK_SHA256" != "$KEY_SHA256" ]; then
+            echo "::error::QA APK signer fingerprint does not match the repository debug keystore."
+            echo "APK signer SHA-256: $APK_SHA256"
+            echo "Expected debug-key SHA-256: $KEY_SHA256"
+            exit 1
+          fi
+          KEY_SHA1_PRETTY="$(printf '%s' "$KEY_SHA1" | sed -E 's/(..)/\1:/g; s/:$//' | tr '[:lower:]' '[:upper:]')"
+          echo "QA applicationId: com.g88.qa"
+          echo "QA deep link scheme: nexa-qa"
+          echo "Non-production debug signing SHA-1 for GOOGLE_MAPS_API_KEY_QA restriction: $KEY_SHA1_PRETTY"
+          sha256sum "$APK"
+
+      - name: Upload QA APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: nexus-worlds-qa-apk-${{ github.run_number }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 5

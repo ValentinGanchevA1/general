@@ -109,6 +109,9 @@ if (localPropertiesFile.exists()) {
 def releaseStoreFile = localProperties.getProperty('RELEASE_STORE_FILE')
 def hasReleaseSigning = releaseStoreFile != null && rootProject.file(releaseStoreFile).exists()
 
+// QA is a separate installable app and must never inherit Production signing.
+def nexusWorldsQaApplicationId = project.findProperty('nexusWorldsQaApplicationId') == 'true'
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -116,14 +119,14 @@ android {
 
     namespace "com.g88"
     defaultConfig {
-        applicationId "com.g88"
+        applicationId(nexusWorldsQaApplicationId ? "com.g88.qa" : "com.g88")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode auto-bumps in CI via -PversionCodeOverride=<run number>;
         // Play rejects duplicate versionCodes across uploads. Defaults to 1 locally.
         versionCode (project.hasProperty('versionCodeOverride') ? project.versionCodeOverride.toInteger() : 1)
         // Keep Play/APK metadata aligned with the public version shown in About/Help.
-        versionName "1.0.0"
+        versionName(nexusWorldsQaApplicationId ? "1.0.0-qa" : "1.0.0")
         buildConfigField "String", "GOOGLE_MAPS_API_KEY_DEBUG", "\"${localProperties.getProperty('GOOGLE_MAPS_API_KEY_DEBUG', '')}\""
     }
     signingConfigs {
@@ -147,17 +150,21 @@ android {
             signingConfig signingConfigs.debug
             manifestPlaceholders = [
                 GOOGLE_MAPS_API_KEY: localProperties.getProperty('GOOGLE_MAPS_API_KEY_DEBUG', ''),
-                usesCleartextTraffic: 'true'
+                usesCleartextTraffic: 'true',
+                nexaUriScheme: nexusWorldsQaApplicationId ? 'nexa-qa' : 'nexa',
+                appLabel: nexusWorldsQaApplicationId ? 'NEXUS QA' : 'NEXUS'
             ]
         }
         release {
             manifestPlaceholders = [
                 GOOGLE_MAPS_API_KEY: localProperties.getProperty('GOOGLE_MAPS_API_KEY_RELEASE', ''),
-                usesCleartextTraffic: 'false'
+                usesCleartextTraffic: 'false',
+                nexaUriScheme: nexusWorldsQaApplicationId ? 'nexa-qa' : 'nexa',
+                appLabel: nexusWorldsQaApplicationId ? 'NEXUS QA' : 'NEXUS'
             ]
             // Use the upload key when configured (CI / release builds); fall back to
             // the debug key locally so `bundleRelease` smoke tests don't require secrets.
-            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            signingConfig (nexusWorldsQaApplicationId ? signingConfigs.debug : (hasReleaseSigning ? signingConfigs.release : signingConfigs.debug))
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

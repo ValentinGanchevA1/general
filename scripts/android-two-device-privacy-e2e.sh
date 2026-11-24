@@ -6,7 +6,7 @@ APK_PATH="${DEVICE_E2E_APK_PATH:-apps/mobile/android/app/build/outputs/apk/relea
 SERIAL_A="${DEVICE_E2E_SERIAL_A:-emulator-5554}"
 SERIAL_B="${DEVICE_E2E_SERIAL_B:-emulator-5556}"
 UI=(python3 scripts/android-two-device-ui.py)
-PACKAGE=com.g88
+PACKAGE=com.g88.qa
 PROBE_PREFIX='[NEXA_E2E_DEVICE]'
 
 state() {
@@ -72,7 +72,7 @@ dismiss_map_coachmark() {
 
   if ui "$serial" wait --value 'You are on the map' --timeout "$timeout_seconds" >/dev/null 2>&1; then
     ui "$serial" tap --value 'Skip' --timeout 5
-    ui "$serial" wait --value 'Connections, chats and activity' --timeout 15
+    ui "$serial" wait --value 'Connections' --timeout 15
   fi
 }
 
@@ -90,7 +90,7 @@ login() {
   ui "$serial" type --value "$password"
   ui "$serial" key --name back
   ui "$serial" tap --value 'Sign in' --timeout 15
-  ui "$serial" wait --value 'Connections, chats and activity' --timeout 90
+  ui "$serial" wait --value 'Connections' --timeout 90
   dismiss_map_coachmark "$serial" 8
 }
 
@@ -101,7 +101,7 @@ open_chat() {
   # The first-run map coachmark can be scheduled just after login settles.
   # Re-check immediately before navigation so it cannot intercept the tab tap.
   dismiss_map_coachmark "$serial" 4
-  ui "$serial" tap --value 'Connections, chats and activity' --timeout 30
+  ui "$serial" tap --value 'Connections' --timeout 30
   ui "$serial" wait --value 'Connections' --timeout 30
   ui "$serial" tap --value 'Chats' --timeout 20
   ui "$serial" wait --value "Chat with ${peer_name}" --contains --timeout 45
@@ -161,7 +161,7 @@ set_geo() {
 }
 
 assert_blocked_rejoin() {
-  local base_url="${DEVICE_E2E_BASE_URL:-https://g88-api.onrender.com}"
+  local base_url="${DEVICE_E2E_BASE_URL:?DEVICE_E2E_BASE_URL must point to the dedicated non-production QA API}"
 
   node --input-type=module - "$STATE_FILE" "$base_url" <<'NODE'
 import { readFile } from 'node:fs/promises';
@@ -306,9 +306,9 @@ main() {
   adb -s "$SERIAL_B" shell am force-stop "$PACKAGE"
   adb -s "$SERIAL_B" logcat -c
   launch_app "$SERIAL_B"
-  ui "$SERIAL_B" wait --value 'Connections, chats and activity' --timeout 75
+  ui "$SERIAL_B" wait --value 'Connections' --timeout 75
   dismiss_map_coachmark "$SERIAL_B" 4
-  ui "$SERIAL_B" tap --value 'Connections, chats and activity'
+  ui "$SERIAL_B" tap --value 'Connections'
   ui "$SERIAL_B" wait --value 'Connections' --timeout 30
   ui "$SERIAL_B" tap --value 'Chats' --timeout 20
 

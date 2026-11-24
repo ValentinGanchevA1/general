@@ -17,7 +17,7 @@ export type WorldModeConfig = Readonly<{
  * Pre-release gate: selector is visible on development builds only.
  * Do not enable in production until Android/iOS a11y + persistence QA passes.
  */
-export const WORLD_MODES_ENABLED = __DEV__;
+export const WORLD_MODES_ENABLED = __DEV__ || process.env.NEXUS_WORLDS_QA === '1';
 
 /** No capabilities or permissions live in this manifest. */
 export const WORLD_MODES: Readonly<Record<WorldModeId, WorldModeConfig>> = {
