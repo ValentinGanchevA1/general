@@ -70,6 +70,8 @@ jobs:
 
       - name: Validate release secrets
         env:
+          # Release sideload APK uses the *release* Maps key only (upload-key SHA-1).
+          # GOOGLE_MAPS_API_KEY_DEBUG is optional here — not required for assembleRelease.
           GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
           GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -81,7 +83,6 @@ jobs:
           set -euo pipefail
           required=(
             NEXA_MAPTILER_API_KEY
-            GOOGLE_MAPS_API_KEY_DEBUG
             GOOGLE_MAPS_API_KEY_RELEASE
             GOOGLE_SERVICES_JSON
             ANDROID_UPLOAD_KEYSTORE_BASE64
@@ -95,6 +96,9 @@ jobs:
               exit 1
             fi
           done
+          if [ -z "${GOOGLE_MAPS_API_KEY_DEBUG:-}" ]; then
+            echo "::notice::GOOGLE_MAPS_API_KEY_DEBUG is unset; release APK will use GOOGLE_MAPS_API_KEY_RELEASE for both local.properties slots."
+          fi
           echo "All required Android release secrets are available."
 
       - name: Guard MapLibre release config
@@ -187,8 +191,16 @@ jobs:
           GOOGLE_MAPS_API_KEY_DEBUG: ${{ secrets.GOOGLE_MAPS_API_KEY_DEBUG }}
           GOOGLE_MAPS_API_KEY_RELEASE: ${{ secrets.GOOGLE_MAPS_API_KEY_RELEASE }}
         run: |
+          set -euo pipefail
+          # assembleRelease reads GOOGLE_MAPS_API_KEY_RELEASE for the manifest.
+          # DEBUG slot is only BuildConfig; fall back to RELEASE so a missing
+          # GOOGLE_MAPS_API_KEY_DEBUG secret does not break the release APK job.
+          DEBUG_KEY="${GOOGLE_MAPS_API_KEY_DEBUG:-}"
+          if [ -z "$DEBUG_KEY" ]; then
+            DEBUG_KEY="${GOOGLE_MAPS_API_KEY_RELEASE}"
+          fi
           cat >> android/local.properties <<EOF
-          GOOGLE_MAPS_API_KEY_DEBUG=${GOOGLE_MAPS_API_KEY_DEBUG}
+          GOOGLE_MAPS_API_KEY_DEBUG=${DEBUG_KEY}
           GOOGLE_MAPS_API_KEY_RELEASE=${GOOGLE_MAPS_API_KEY_RELEASE}
           EOF
 
