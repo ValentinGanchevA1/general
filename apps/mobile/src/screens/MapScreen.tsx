@@ -562,14 +562,14 @@ export function MapScreen(): React.JSX.Element {
 				pinSend({ type: 'WAVE_MUTUAL' });
 			}
 		});
-		const unsubMatch = on('dating:match_created', (e) => {
+		const unsubMatch = DATING_ENABLED ? on('dating:match_created', (e) => {
 			if (activePinId != null && e.peerUserId === activePinId) {
 				pinSend({
 					type: 'MATCH_CREATED',
 					datingConversationId: e.datingConversationId,
 				});
 			}
-		});
+		}) : () => undefined;
 		return () => {
 			unsubMutual();
 			unsubMatch();
@@ -582,7 +582,7 @@ export function MapScreen(): React.JSX.Element {
 	}, [pinMachineError]);
 
 	useEffect(() => {
-		if (pinLastResult === 'matched' && pinDatingConversationId) {
+		if (DATING_ENABLED && pinLastResult === 'matched' && pinDatingConversationId) {
 			const name = seedDisplayName;
 			const conversationId = pinDatingConversationId;
 			const peerId = activePinId;
