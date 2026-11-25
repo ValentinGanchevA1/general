@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { DATING_ENABLED } from '@/constants/app';
 
 import type { Gender, SexualOrientation } from '@g88/shared';
 import {
@@ -226,7 +227,7 @@ export function ProfileEditScreen(): React.JSX.Element {
   const switchTrack = { false: colors.borderStrong, true: colors.primaryTrack };
 
   useEffect(() => {
-    if (focus !== 'dating') return;
+    if (focus !== 'dating' || !DATING_ENABLED) return;
     const t = setTimeout(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, datingYRef.current - 16), animated: true });
     }, 120);
@@ -268,8 +269,8 @@ export function ProfileEditScreen(): React.JSX.Element {
       showGender,
       showOrientation,
       showNationality,
-      openToDating,
-      seekingGenders,
+      openToDating: DATING_ENABLED && openToDating,
+      seekingGenders: DATING_ENABLED ? seekingGenders : [],
     }));
     if (updateProfile.fulfilled.match(result)) navigation.goBack();
   };
@@ -385,7 +386,7 @@ export function ProfileEditScreen(): React.JSX.Element {
         {sexualOrientation === 'self_describe' ? <FormField label="Describe orientation" value={orientationSelfDescribe} onChangeText={setOrientationSelfDescribe} placeholder="Your terms" maxLength={40} testID="profile-edit-orientation-self" /> : null}
         <VisibilityLine label="Orientation" value={showOrientation} onChange={setShowOrientation} sensitive />
 
-        <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
+        {DATING_ENABLED ? <View onLayout={(e) => { datingYRef.current = e.nativeEvent.layout.y; }}>
           <Text style={styles.section}>DATING</Text>
           <Text style={styles.hint}>Opt in to appear when others use the Dating map filter. Seeking is private.</Text>
           <View style={styles.toggleRow}><View style={styles.toggleText}><Text style={styles.toggleLabel}>Open to dating</Text></View>{themedSwitch(openToDating, setOpenToDating)}</View>
@@ -397,7 +398,7 @@ export function ProfileEditScreen(): React.JSX.Element {
             })}</View>
             <Text style={styles.hint}>Leave empty to match any gender.</Text>
           </> : null}
-        </View>
+        </View> : null}
 
         <Text style={styles.section}>PHONE</Text>
         <Text style={styles.hint}>{profile?.phone ? profile.badges?.phone ? 'Verified — changing it requires re-verification.' : 'Saved but not verified yet.' : 'Add and verify a phone number to strengthen trust.'}</Text>
