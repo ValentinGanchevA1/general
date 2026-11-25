@@ -191,7 +191,7 @@ export class S3Service {
       throw new Error('S3 media URLs must use HTTPS');
     }
 
-    const key = url.pathname.replace(/^\\/+/, '');
+    const key = url.pathname.replace(/^\//, '');
     const parts = key.split('/');
     const allowedPrefixes = new Set(['avatars', 'photos', 'listings', 'stories']);
     if (
