@@ -116,7 +116,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setVideoReady(mediaType !== 'video');
       setVideoFailed(false);
       setVideoBuffering(false);
-      setVideoEpoch(0);\n      setImageFailed(false);
+      setVideoEpoch(0);
+      setImageFailed(false);
     });
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
