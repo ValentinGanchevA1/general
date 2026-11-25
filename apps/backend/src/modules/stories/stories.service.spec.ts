@@ -22,6 +22,7 @@ describe('StoriesService', () => {
   let redisGet: jest.Mock;
   let redisDel: jest.Mock;
   let storyPresignedUrl: jest.Mock;
+  let mediaReadUrl: jest.Mock;
   let emitStoryNew: jest.Mock;
 
   const USER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -82,6 +83,7 @@ describe('StoriesService', () => {
       uploadUrl: 'https://s3.example/put',
       publicUrl: PUBLIC_URL,
     });
+    mediaReadUrl = jest.fn().mockImplementation(async (url: string) => `signed:${url}`);
     emitStoryNew = jest.fn();
 
     const mod = await Test.createTestingModule({
@@ -91,7 +93,7 @@ describe('StoriesService', () => {
           provide: getDataSourceToken(),
           useValue: { query } as unknown as DataSource,
         },
-        { provide: S3Service, useValue: { storyPresignedUrl } },
+        { provide: S3Service, useValue: { storyPresignedUrl, mediaReadUrl } },
         { provide: RealtimeGateway, useValue: { emitStoryNew } },
         {
           provide: REDIS_CLIENT,
@@ -272,6 +274,8 @@ describe('StoriesService', () => {
 
       expect(redisDel).toHaveBeenCalled();
       expect(card.id).toBe('story-1');
+      expect(card.mediaUrl).toBe(`signed:${PUBLIC_URL}`);
+      expect(mediaReadUrl).toHaveBeenCalledWith(PUBLIC_URL);
       expect(emitStoryNew).toHaveBeenCalledWith(
         expect.objectContaining({
           story: expect.objectContaining({ id: 'story-1' }),
