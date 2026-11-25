@@ -9,6 +9,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 import { S3Service } from '../../common/s3.service';
+import { datingFeatureEnabled } from '../dating/dating-feature';
 
 import type {
   AuthenticatedUser,
@@ -590,12 +591,12 @@ export class UsersService {
       setClauses.push(`show_nationality = $${params.length}`);
     }
     if (req.openToDating !== undefined) {
-      params.push(req.openToDating);
-      setClauses.push(`open_to_dating = $${params.length}`);
+      params.push(datingFeatureEnabled() && req.openToDating);
+      setClauses.push(`open_to_dating = ${params.length}`);
     }
     if (req.seekingGenders !== undefined) {
-      params.push(req.seekingGenders);
-      setClauses.push(`seeking_genders = $${params.length}`);
+      params.push(datingFeatureEnabled() ? req.seekingGenders : []);
+      setClauses.push(`seeking_genders = ${params.length}`);
     }
     if (req.friendsSeeOnlineStatus !== undefined) {
       params.push(req.friendsSeeOnlineStatus);
