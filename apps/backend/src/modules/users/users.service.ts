@@ -592,11 +592,11 @@ export class UsersService {
     }
     if (req.openToDating !== undefined) {
       params.push(datingFeatureEnabled() && req.openToDating);
-      setClauses.push(`open_to_dating = ${params.length}`);
+      setClauses.push(`open_to_dating = $${params.length}`);
     }
     if (req.seekingGenders !== undefined) {
       params.push(datingFeatureEnabled() ? req.seekingGenders : []);
-      setClauses.push(`seeking_genders = ${params.length}`);
+      setClauses.push(`seeking_genders = $${params.length}`);
     }
     if (req.friendsSeeOnlineStatus !== undefined) {
       params.push(req.friendsSeeOnlineStatus);
