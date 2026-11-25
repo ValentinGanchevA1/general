@@ -24,6 +24,7 @@ import type {
 	CreateConversationResponse,
 } from '@g88/shared';
 
+import { DATING_ENABLED } from '@/constants/app';
 import { useDiscovery } from '@/features/discovery/useDiscovery';
 import { setPoints } from '@/features/discovery/discoverySlice';
 import { useSocket } from '@/realtime/useSocket';
@@ -170,12 +171,13 @@ export function MapScreen(): React.JSX.Element {
 	const layers = resolveLensLayers(activeLens, customLayers);
 	const [friendsOnly, setFriendsOnly] = useState(false);
 	const [datingOnly, setDatingOnly] = useState(false);
+	const effectiveDatingOnly = DATING_ENABLED && datingOnly;
 	const [rankBy, setRankBy] = useState<DiscoveryRankBy>('relevance');
 	const [searchQuery, setSearchQuery] = useState('');
 	const [trendingCollapsed, setTrendingCollapsed] = useState(true);
 	const insets = useSafeAreaInsets();
 
-	const viewerMode = datingOnly ? 'dating' : 'social';
+	const viewerMode = effectiveDatingOnly ? 'dating' : 'social';
 	const {
 		openUserPin,
 		dismiss: dismissPinPreview,
@@ -227,7 +229,7 @@ export function MapScreen(): React.JSX.Element {
 		kinds,
 		listingMode: peopleLayer && (friendsOnly || datingOnly) ? undefined : listingsLayer ? listingMode : undefined,
 		friendsOnly: peopleLayer && friendsOnly,
-		datingOnly: peopleLayer && datingOnly && !friendsOnly,
+		datingOnly: effectiveDatingOnly && peopleLayer && !friendsOnly,
 		rankBy,
 	});
 	const refreshSpatialDiscovery = useCallback(() => {
@@ -844,8 +846,8 @@ export function MapScreen(): React.JSX.Element {
 
 	const emptyCopy = mapEmptyCopy({
 		friendsOnly,
-		datingOnly,
-		openToDating,
+		datingOnly: effectiveDatingOnly,
+		openToDating: DATING_ENABLED && openToDating,
 		listingMode: listingModeFilter,
 		emailVerified,
 	});
@@ -859,7 +861,7 @@ export function MapScreen(): React.JSX.Element {
 				setDatingOnly(false);
 				return;
 			case 'dating_prefs':
-				openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
+				if (DATING_ENABLED) openRootScreen(navigation, 'ProfileEdit', { focus: 'dating' });
 				return;
 			case 'verify_email':
 				openRootScreen(navigation, 'TrustCenter', { focusStep: 'email' });
@@ -947,7 +949,7 @@ export function MapScreen(): React.JSX.Element {
 				onListingModeChange={setListingModeFilter}
 				friendsOnly={friendsOnly}
 				onFriendsOnlyChange={setFriendsOnly}
-				datingOnly={datingOnly}
+				datingOnly={effectiveDatingOnly}
 				onDatingOnlyChange={setDatingOnly}
 				rankBy={rankBy}
 				onRankByChange={setRankBy}
