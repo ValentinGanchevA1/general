@@ -15,7 +15,7 @@ on:
       version_code:
         description: "Optional explicit Android versionCode; empty uses workflow run number"
         required: false
-        default: ""
+        default: "13"
       publish:
         description: "Explicitly opt in to Play upload (default is safe build-only; requires PLAY_SERVICE_ACCOUNT_JSON)"
         type: boolean
