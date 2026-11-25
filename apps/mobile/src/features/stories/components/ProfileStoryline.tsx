@@ -43,6 +43,7 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
   const [loading, setLoading] = useState(true);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [failedStoryIds, setFailedStoryIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -107,7 +108,8 @@ export function ProfileStoryline({ userId, isSelf = false }: Props): React.JSX.E
                 accessibilityLabel={`Story: ${label}`}
               >
                 <View style={styles.thumbWrap}>
-                  <Image source={{ uri: item.mediaUrl }} style={styles.thumb} />
+                  <Image source={{ uri: item.mediaUrl }} style={styles.thumb} onLoad={() => setFailedStoryIds((prev) => { const next = new Set(prev); next.delete(item.id); return next; })} onError={() => { setFailedStoryIds((prev) => new Set(prev).add(item.id)); console.warn("[ProfileStoryline] thumbnail load failed"); }} />
+                  {failedStoryIds.has(item.id) ? <View style={[styles.captionGradient, { justifyContent: "center" }]}><Text style={styles.caption}>Image unavailable</Text></View> : null}
                   {active ? (
                     <View style={styles.liveBadge}>
                       <Text style={styles.liveText}>LIVE</Text>
