@@ -83,10 +83,16 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
   - photos/video and verification uploads where enabled;
   - messages/interactions;
   - diagnostics/analytics;
-  - deletion behavior.
+  - deletion behavior;
+  - data transmitted by every third-party library/SDK and any service provider; reconcile SDK declarations with the final signed AAB and production configuration.
 - [ ] Confirm data-in-transit encryption declarations against production configuration.
 - [ ] Confirm account deletion is described consistently with the in-app delete flow and a **public external deletion-request URL** is deployed/verified (`docs/legal/delete-account/index.html` is draft source only).
 - [ ] Complete content rating, target audience, app access and any other Play declarations truthfully.
+- [ ] Select **18 and over only** for the first NEXUS release, matching the owner-approved product scope (Social 18+, Dating OFF). A self-entered DOB is an age declaration, not independent proof of age.
+- [ ] Review whether the core nearby-people discovery + spontaneous chat flow is considered by Google Play to facilitate randomly connecting users who do not know one another. If in scope, use the Play Console functionality/tools to block minors; do not rely on a hidden client screen alone. Given the chosen 18+ scope, treat Restrict Minor Access as a required owner-side Console check until policy classification is documented.
+- [ ] Apply the Google Play policy update announced 15 July 2026 and effective 26 August 2026: the age-restricted functionality policy explicitly includes apps whose core functionality is to randomly connect users to spontaneously communicate with people they do not know. Document NEXUS's real discovery/Waves/chat flow against this definition; Dating OFF does not by itself resolve the random-chat classification.
+- [ ] The same 26 August 2026 expansion brings anonymous/random chat apps into the Child Safety Standards policy scope. Keep the standards/reporting/contact gate open even if the final Play classification is Social and no children are intended to use the app.
+- [ ] Confirm the app's Play category. If declared as **Social**, Child Safety Standards apply even when the target audience is adults only; excluding children from the audience does not remove this obligation.
 - [ ] **Precise location permission declaration (new November 2026 Play Console workflow):**
   - The Android manifest requests `ACCESS_FINE_LOCATION` **and** `ACCESS_COARSE_LOCATION`; do not characterize NEXUS as coarse-only.
   - For the user-facing purpose, distinguish **Search nearby** (public map discovery) from **Live tracking** (user-initiated, continuously updated precise location in 1:1 chat).
@@ -96,6 +102,26 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
   - Re-check the final merged/signed AAB manifest and runtime permissions; source manifest alone is insufficient.
 - [ ] **Data Safety precision:** NEXUS's public ~120m H3 cell is still below Google's **3 km²** threshold for *precise* location. Mark precise-location collection based on off-device processing and optional live DM persistence, not solely on how coarsened pins look.
 - [ ] **UGC Terms acceptance:** #592 requires versioned Terms acceptance before posting/uploading; showing a Terms hyperlink without an actual acceptance state is insufficient.
+
+### 6A. 18+ enforcement and Child Safety Standards
+
+- [ ] Verify the exact signed release AAB and deployed API enforce adult eligibility for email registration, Google OAuth, existing/legacy accounts, refresh/session restore, protected REST routes and Socket.IO. Keep production `NEXUS_REQUIRE_ADULT_AGE` OFF until separately isolated staging and physical-device cases pass.
+- [ ] Test an under-18 synthetic account, DOB-null legacy account, OAuth DOB-null account, account switch, network/database failure, deep link, push, and active Socket.IO session. No protected Social access is allowed until the server confirms eligibility.
+- [ ] Keep Dating disabled end-to-end for RC1: mobile UI, profile preference writes, REST likes/pass, Dating discovery and Dating realtime events. Track #1173; do not turn on either Dating approval setting for RC1.
+- [ ] For a Social-category app, prepare publicly accessible CSAE/CSAM standards regardless of the selected target age. The final standards must be legally reviewed and published; the present Child Safety document and PR #1140 are review candidates only.
+- [ ] Verify the complete in-app report/feedback and block mechanisms on the exact signed AAB and deployed API; run synthetic report → admin queue → authorized moderation action → audit trail tests. Do not claim CSAM operational handling solely from source files.
+- [ ] Confirm the named Child Safety point of contact, exact Play developer-account mailbox, monitored access and successful test delivery. Do not publish an address until the owner confirms it and delivery is verified.
+- [ ] Record operational coverage, backup responder, lawful escalation route and evidence-retention/deletion process with counsel. Do not promise a 24/7 or fixed response SLA without staffed capacity.
+- [ ] Product owner reviews the release candidate first; a qualified legal reviewer then approves the exact final Terms, Privacy and Child Safety text/version/effective date before public publication and Play submission.
+- [ ] **Publication warning:** Render `g88-legal` auto-deploys `master` and publishes `docs/legal`. Merging a final Terms/Child Safety page publishes it automatically. Keep legal candidate pages in review until the approval record is complete.
+- [ ] Verify anonymous HTTPS 200 + final page content, version/date, NEXUS branding, policy links and mobile layout after approved publication.
+
+Policy references:
+- Age-restricted functionality: https://support.google.com/googleplay/android-developer/answer/16302250
+- Child Safety Standards: https://support.google.com/googleplay/android-developer/answer/14747720
+- User-generated content: https://support.google.com/googleplay/android-developer/answer/9876937
+- Data Safety: https://support.google.com/googleplay/android-developer/answer/10787469
+
 
 ## 7. NEXUS legal gate — production only
 
@@ -151,7 +177,9 @@ If Play/API publishing is enabled later:
 Production is **GO** only when all of the following are true:
 
 - [ ] exact release candidate passes #580 on a physical Android device;
-- [ ] #592 dedicated Terms requirement is resolved;
+- [ ] #592 dedicated Terms requirement is resolved, with affirmative current-version acceptance enforced before UGC creation/upload;
+- [ ] 18+ enforcement passes isolated staging and physical-device tests; Play Console minor restriction is configured where required;
+- [ ] Child Safety Standards are legally approved, publicly published and operationally tested (including reporting/contact);
 - [ ] Privacy/Terms/Data Safety/store copy match actual production behavior;
 - [ ] Play App Signing + Maps restrictions are verified on a Play-installed build;
 - [ ] no P0/P1 product, privacy, trust, abuse-prevention or release regressions remain.
