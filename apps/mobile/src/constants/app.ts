@@ -5,6 +5,9 @@
 /** Marketing/display version shown on About + Profile footer. */
 export const APP_VERSION = '1.0.0';
 
+/** Dating is not part of the first public NEXUS release. */
+export const DATING_ENABLED = false;
+
 /** Support + data-request contact. Mirrors the privacy policy's contact email. */
 export const SUPPORT_EMAIL = 'vganchev6@gmail.com';
 
