@@ -30,6 +30,7 @@ import { useWorldModeVisuals } from '@/features/worldModes/useWorldModeVisuals';
 import { resolveWorldSearchPlaceholder } from '@/features/worldModes/worldSearchPlaceholder';
 import { MapWorldSelector } from './MapWorldSelector';
 import { WORLD_MODES_ENABLED } from '@/features/worldModes/worldModes';
+import { NEXA_MAP_CHROME_PROTOTYPE_ENABLED } from '@/features/map/mapChromePrototype';
 
 export type ListingModeFilterValue = 'all' | ListingMode;
 export const DEFAULT_MAP_LAYERS: EntityKind[] = ['user'];
@@ -410,22 +411,23 @@ function ChoiceRow({ label, active, onPress, colors, styles }: { label: string; 
 }
 
 function createStyles(colors: ThemeColors) {
+	const prototypeEnabled = NEXA_MAP_CHROME_PROTOTYPE_ENABLED;
 	return StyleSheet.create({
 		wrap: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 30, gap: 8 },
 		searchRow: { height: MAP_SEARCH_BAR_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
-		searchShell: { flex: 1, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: radius.xl, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 7, gap: 9, backgroundColor: colors.surfacePrimary },
+		searchShell: { flex: 1, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: radius.xl, borderWidth: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: prototypeEnabled ? 16 : 14, paddingRight: prototypeEnabled ? 8 : 7, gap: prototypeEnabled ? 10 : 9, backgroundColor: colors.surfacePrimary },
 		searchInput: { flex: 1, height: '100%', color: colors.textPrimary, fontSize: fontSize.md, fontWeight: '600', paddingVertical: 0 },
 		clearButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
 		locateButton: { width: MAP_SEARCH_BAR_HEIGHT, height: MAP_SEARCH_BAR_HEIGHT, borderRadius: MAP_SEARCH_BAR_HEIGHT / 2, borderWidth: 1, borderColor: colors.discoveryBorder, backgroundColor: colors.discoverySoft, alignItems: 'center', justifyContent: 'center' },
 		controlRow: { height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 8 },
-		layers: { flex: 1, height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', gap: 5 },
-		layerChip: { flex: 1, minWidth: 0, height: MAP_LAYER_ROW_HEIGHT, paddingHorizontal: 4, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-		layerText: { flexShrink: 1, fontSize: 11, fontWeight: '700' },
+		layers: { flex: 1, height: MAP_LAYER_ROW_HEIGHT, flexDirection: 'row', gap: prototypeEnabled ? 6 : 5 },
+		layerChip: { flex: 1, minWidth: 0, height: MAP_LAYER_ROW_HEIGHT, paddingHorizontal: prototypeEnabled ? 6 : 4, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: prototypeEnabled ? 5 : 4 },
+		layerText: { flexShrink: 1, fontSize: 11, fontWeight: '700', letterSpacing: prototypeEnabled ? 0.15 : 0 },
 		filterButton: { width: MAP_LAYER_ROW_HEIGHT, height: MAP_LAYER_ROW_HEIGHT, borderRadius: MAP_LAYER_ROW_HEIGHT / 2, borderWidth: 1, borderColor: colors.borderDefault, backgroundColor: colors.surfacePrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
 		filterButtonActive: { borderColor: colors.actionPrimary, backgroundColor: colors.actionSoft },
 		filterBadge: { position: 'absolute', right: -2, top: -2, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.actionPrimary },
 		filterBadgeText: { color: colors.onPrimary, fontSize: 9, lineHeight: 11, fontWeight: '800', textAlign: 'center' },
-		pressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
+		pressed: { opacity: prototypeEnabled ? 0.78 : 0.72, transform: [{ scale: prototypeEnabled ? 0.985 : 0.97 }] },
 		modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.68)', justifyContent: 'center', padding: spacing.xl },
 		modalCard: { maxHeight: '86%', borderRadius: radius.xl, borderWidth: 1, borderColor: colors.borderStrong, padding: spacing.lg, backgroundColor: colors.surfacePrimary },
 		modalTitle: { color: colors.textPrimary, fontSize: fontSize.lg, fontWeight: '800' },

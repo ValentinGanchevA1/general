@@ -49,6 +49,9 @@ export const Config = {
   // the rollout resolver fails closed to legacy for every other value.
   MAP_RENDERER_REQUESTED:
     (process.env.NEXA_MAP_RENDERER as string | undefined) ?? 'legacy',
+  // Opt-in to the incremental Map Chrome visual prototype; unset/0 keeps current UI.
+  MAP_CHROME_PROTOTYPE_REQUESTED:
+    (process.env.NEXA_MAP_CHROME_PROTOTYPE as string | undefined) ?? '0',
   // Public MapTiler client configuration. The API key is embedded in the app bundle;
   // treat it as a client credential and restrict/rotate it in MapTiler, never as a secret.
   MAPTILER_API_KEY:

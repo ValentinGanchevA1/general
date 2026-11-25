@@ -19,6 +19,7 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useUserLocation } from '@/features/location/useUserLocation';
 import { fontSize, radius, spacing, useAppTheme } from '@/theme';
 import { formatNexaSpatialDistance } from './nexaSpatialSheet';
+import { NEXA_MAP_CHROME_PROTOTYPE_ENABLED } from '@/features/map/mapChromePrototype';
 
 /** Header + avatar row + panel spacing. */
 export const NEARBY_PEOPLE_RAIL_HEIGHT = 124;
@@ -87,7 +88,8 @@ export function NearbyPeopleRail({
 			style={[
 				styles.wrap,
 				{
-					borderColor: colors.borderStrong,
+					borderColor: NEXA_MAP_CHROME_PROTOTYPE_ENABLED ? colors.borderSubtle : colors.borderStrong,
+					backgroundColor: NEXA_MAP_CHROME_PROTOTYPE_ENABLED ? colors.surfaceRaised : 'rgba(10,10,15,0.90)',
 					shadowColor: colors.shadowInk,
 				},
 			]}
