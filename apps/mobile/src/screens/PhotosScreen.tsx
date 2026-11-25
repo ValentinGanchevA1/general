@@ -61,6 +61,7 @@ export function PhotosScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set());
   const coverUrl = coverOverride !== undefined ? coverOverride : profileCoverUrl;
 
   useEffect(() => {
@@ -108,7 +109,8 @@ export function PhotosScreen(): React.JSX.Element {
               const isCover = urlsMatch(photo.url, coverUrl);
               return (
                 <TouchableOpacity key={photo.id} style={styles.tile} onPress={() => onTapPhoto(photo, isMain)} disabled={busy}>
-                  <Image source={{ uri: photo.url }} style={styles.tileImage} />
+                  <Image source={{ uri: photo.url }} style={styles.tileImage} onLoad={() => setFailedPhotoIds((prev) => { const next = new Set(prev); next.delete(photo.id); return next; })} onError={() => { setFailedPhotoIds((prev) => new Set(prev).add(photo.id)); console.warn("[PhotosScreen] image load failed", { photoIndex: index }); }} />
+                  {failedPhotoIds.has(photo.id) ? <View style={[styles.badgeRow, { top: "45%", justifyContent: "center" }]}><Text style={styles.error}>Image unavailable</Text></View> : null}
                   {(isMain || isCover) ? <View style={styles.badgeRow}>
                     {isMain ? <View style={[styles.tag, styles.mainTag]}><Text style={styles.mainTagText}>MAIN</Text></View> : null}
                     {isCover ? <View style={[styles.tag, styles.coverTag]}><Text style={styles.coverTagText}>COVER</Text></View> : null}
