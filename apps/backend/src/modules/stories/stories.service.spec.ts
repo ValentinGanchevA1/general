@@ -275,7 +275,7 @@ describe('StoriesService', () => {
       expect(redisDel).toHaveBeenCalled();
       expect(card.id).toBe('story-1');
       expect(card.mediaUrl).toBe(`signed:${PUBLIC_URL}`);
-      expect(mediaReadUrl).toHaveBeenCalledWith(PUBLIC_URL);
+      expect(mediaReadUrl).toHaveBeenCalledWith(PUBLIC_URL, USER);
       expect(emitStoryNew).toHaveBeenCalledWith(
         expect.objectContaining({
           story: expect.objectContaining({ id: 'story-1' }),

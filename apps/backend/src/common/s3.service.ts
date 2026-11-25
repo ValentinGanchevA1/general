@@ -173,7 +173,7 @@ export class S3Service {
    * External media URLs are preserved; canonical bucket URLs are signed only
    * for display-media prefixes. Verification objects are deliberately excluded.
    */
-  async mediaReadUrl(mediaUrl: string): Promise<string> {
+  async mediaReadUrl(mediaUrl: string, expectedOwnerId: string): Promise<string> {
     if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
 
     let url: URL;
@@ -184,8 +184,11 @@ export class S3Service {
     }
 
     const expectedHost = `${this.bucket}.s3.${this.region}.amazonaws.com`;
-    if (url.protocol !== 'https:' || url.hostname !== expectedHost) {
+    if (url.hostname !== expectedHost) {
       return mediaUrl;
+    }
+    if (url.protocol !== 'https:') {
+      throw new Error('S3 media URLs must use HTTPS');
     }
 
     const key = url.pathname.replace(/^\\/+/, '');
@@ -193,7 +196,7 @@ export class S3Service {
     const allowedPrefixes = new Set(['avatars', 'photos', 'listings', 'stories']);
     if (
       !allowedPrefixes.has(parts[0] ?? '') ||
-      !parts[1] ||
+      parts[1] !== expectedOwnerId ||
       !parts[2] ||
       parts.length !== 3 ||
       parts.some((part) => !part || part === '.' || part === '..')

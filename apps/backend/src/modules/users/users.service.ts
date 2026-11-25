@@ -210,7 +210,7 @@ export class UsersService {
       [id],
     );
     if (!rows[0]) return null;
-    const avatarUrl = await this.signMediaUrl(rows[0].avatar_url);
+    const avatarUrl = await this.signMediaUrl(rows[0].avatar_url, id);
     return this.toPublic({ ...rows[0], avatar_url: avatarUrl });
   }
 
@@ -232,8 +232,8 @@ export class UsersService {
       ),
     ]);
     const [avatarUrl, coverUrl] = await Promise.all([
-      this.signMediaUrl(rows[0].avatar_url),
-      this.signMediaUrl(rows[0].cover_url),
+      this.signMediaUrl(rows[0].avatar_url, userId),
+      this.signMediaUrl(rows[0].cover_url, userId),
     ]);
     return this.toProfile(
       { ...rows[0], avatar_url: avatarUrl, cover_url: coverUrl },
@@ -304,8 +304,8 @@ export class UsersService {
     ]);
     const photoUrls = photos.map((ph) => ph.url);
     const [avatarUrl, coverUrl] = await Promise.all([
-      this.signMediaUrl(r.avatar_url),
-      this.signMediaUrl(r.cover_url),
+      this.signMediaUrl(r.avatar_url, r.id),
+      this.signMediaUrl(r.cover_url, r.id),
     ]);
 
     return {
@@ -647,7 +647,7 @@ export class UsersService {
     );
     return Promise.all(rows.map(async (r) => ({
       id: r.id,
-      url: (await this.signMediaUrl(r.url)) ?? r.url,
+      url: (await this.signMediaUrl(r.url, userId)) ?? r.url,
       position: r.position,
       createdAt: toIsoOrNow(r.created_at),
     })));
@@ -727,18 +727,18 @@ export class UsersService {
       `SELECT url FROM user_photos WHERE user_id = $1 ORDER BY position ASC LIMIT $2`,
       [userId, MAX_PHOTOS],
     );
-    return Promise.all(rows.map(async (r) => (await this.signMediaUrl(r.url)) ?? r.url));
+    return Promise.all(rows.map(async (r) => (await this.signMediaUrl(r.url, userId)) ?? r.url));
   }
 
   /**
    * Sign only media URLs belonging to the configured private S3 bucket.
    * Test doubles that omit the S3 helper retain their original URL behavior.
    */
-  private async signMediaUrl(url: string | null): Promise<string | null> {
+  private async signMediaUrl(url: string | null, ownerId: string): Promise<string | null> {
     if (url == null) return null;
     const signer = this.s3.mediaReadUrl;
     if (typeof signer !== 'function') return url;
-    return signer.call(this.s3, url);
+    return signer.call(this.s3, url, ownerId);
   }
 
   private async getSocialLinks(userId: string): Promise<SocialLink[]> {

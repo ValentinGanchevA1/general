@@ -617,17 +617,17 @@ export class StoriesService {
     });
   }
 
-  private async signMediaUrl(url: string | null): Promise<string | null> {
+  private async signMediaUrl(url: string | null, ownerId: string): Promise<string | null> {
     if (url == null) return null;
     const signer = this.s3.mediaReadUrl;
     if (typeof signer !== 'function') return url;
-    return signer.call(this.s3, url);
+    return signer.call(this.s3, url, ownerId);
   }
 
   private async toCard(r: StoryRow): Promise<StoryCard> {
     const [mediaUrl, authorAvatarUrl] = await Promise.all([
-      this.signMediaUrl(r.media_url),
-      this.signMediaUrl(r.avatar_url),
+      this.signMediaUrl(r.media_url, r.author_id),
+      this.signMediaUrl(r.avatar_url, r.author_id),
     ]);
     return {
       id: r.id,
