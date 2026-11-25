@@ -12,6 +12,12 @@ const context = {
 };
 
 describe('DiscoveryEntityResolver', () => {
+  const previousDatingFlag = process.env.NEXUS_DATING_ENABLED;
+  beforeAll(() => { process.env.NEXUS_DATING_ENABLED = 'true'; });
+  afterAll(() => {
+    if (previousDatingFlag === undefined) delete process.env.NEXUS_DATING_ENABLED;
+    else process.env.NEXUS_DATING_ENABLED = previousDatingFlag;
+  });
   let resolver: DiscoveryEntityResolver;
   let query: jest.Mock;
   let listFriendIds: jest.Mock;
@@ -159,6 +165,20 @@ describe('DiscoveryEntityResolver', () => {
         context: { ...context, datingOnly: true },
       }),
     ).resolves.toBeNull();
+  });
+
+  it('returns null for Dating subscription while disabled', async () => {
+    const previous = process.env.NEXUS_DATING_ENABLED;
+    delete process.env.NEXUS_DATING_ENABLED;
+    try {
+      await expect(resolver.resolveForViewer({
+        viewerId: 'viewer', kind: 'user', entityId: 'u1', context: { ...context, datingOnly: true },
+      })).resolves.toBeNull();
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.NEXUS_DATING_ENABLED;
+      else process.env.NEXUS_DATING_ENABLED = previous;
+    }
   });
 
   it('returns null when the entity is not visible to the viewer', async () => {
