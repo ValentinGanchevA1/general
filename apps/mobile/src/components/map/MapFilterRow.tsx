@@ -12,6 +12,7 @@ import {
 	View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { DATING_ENABLED } from '@/constants/app';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -129,7 +130,7 @@ export function MapFilterRow({
 	const activeAdvancedFilterCount = useMemo(() => {
 		let count = 0;
 		if (friendsOnly) count += 1;
-		if (datingOnly) count += 1;
+		if (DATING_ENABLED && datingOnly) count += 1;
 		if (rankBy !== 'relevance') count += 1;
 		if (savedPlacesEnabled) count += 1;
 		if (showListings && marketplaceKind !== 'all') count += 1;
@@ -359,7 +360,7 @@ function FilterModal(props: FilterModalProps): React.JSX.Element {
 						{props.showPeople ? <>
 							<SectionLabel styles={styles}>People</SectionLabel>
 							<ChoiceRow styles={styles} colors={colors} label="Friends only" active={props.friendsOnly} onPress={() => { props.onFriendsOnlyChange(!props.friendsOnly); if (!props.friendsOnly) props.onDatingOnlyChange(false); }} />
-							<ChoiceRow styles={styles} colors={colors} label="Dating" active={props.datingOnly} onPress={() => { props.onDatingOnlyChange(!props.datingOnly); if (!props.datingOnly) props.onFriendsOnlyChange(false); }} />
+							{DATING_ENABLED ? <ChoiceRow styles={styles} colors={colors} label="Dating" active={props.datingOnly} onPress={() => { props.onDatingOnlyChange(!props.datingOnly); if (!props.datingOnly) props.onFriendsOnlyChange(false); }} /> : null}
 						</> : null}
 
 						{props.showListings ? <>
