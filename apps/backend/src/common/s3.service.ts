@@ -11,6 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
 const USER_OBJECT_PREFIXES = ['avatars', 'photos', 'listings', 'verifications', 'stories'] as const;
+const MEDIA_READ_URL_TTL_SECONDS = 60 * 60;
 
 @Injectable()
 export class S3Service {
@@ -165,6 +166,46 @@ export class S3Service {
       }),
     );
     return key;
+  }
+
+  /**
+   * Return a short-lived read URL for app media stored in this private bucket.
+   * External media URLs are preserved; canonical bucket URLs are signed only
+   * for display-media prefixes. Verification objects are deliberately excluded.
+   */
+  async mediaReadUrl(mediaUrl: string, expectedOwnerId: string): Promise<string> {
+    if (!this.bucket) throw new Error('AWS_S3_BUCKET not configured');
+
+    let url: URL;
+    try {
+      url = new URL(mediaUrl);
+    } catch {
+      throw new Error('Invalid media URL');
+    }
+
+    const expectedHost = `${this.bucket}.s3.${this.region}.amazonaws.com`;
+    if (url.hostname !== expectedHost) {
+      return mediaUrl;
+    }
+    if (url.protocol !== 'https:') {
+      throw new Error('S3 media URLs must use HTTPS');
+    }
+
+    const key = url.pathname.replace(/^\//, '');
+    const parts = key.split('/');
+    const allowedPrefixes = new Set(['avatars', 'photos', 'listings', 'stories']);
+    if (
+      !allowedPrefixes.has(parts[0] ?? '') ||
+      parts[1] !== expectedOwnerId ||
+      !parts[2] ||
+      parts.length !== 3 ||
+      parts.some((part) => !part || part === '.' || part === '..')
+    ) {
+      throw new Error('S3 object is not eligible for media delivery');
+    }
+
+    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    return getSignedUrl(this.client, command, { expiresIn: MEDIA_READ_URL_TTL_SECONDS });
   }
 
   async verificationReadUrl(key: string): Promise<string> {

@@ -272,7 +272,7 @@ export class StoriesService {
       [userId, cells, limit],
     )) as StoryRow[];
 
-    return rows.map((r) => this.toCard(r));
+    return Promise.all(rows.map((r) => this.toCard(r)));
   }
 
   async getOne(userId: string, storyId: string): Promise<StoryCard> {
@@ -466,7 +466,7 @@ export class StoriesService {
       [viewerId, authorId, limit],
     )) as StoryRow[];
 
-    return rows.map((r) => this.toCard(r));
+    return Promise.all(rows.map((r) => this.toCard(r)));
   }
 
   private async assertMediaUrlFromPresign(userId: string, mediaUrl: string): Promise<void> {
@@ -617,14 +617,25 @@ export class StoriesService {
     });
   }
 
-  private toCard(r: StoryRow): StoryCard {
+  private async signMediaUrl(url: string | null, ownerId: string): Promise<string | null> {
+    if (url == null) return null;
+    const signer = this.s3.mediaReadUrl;
+    if (typeof signer !== 'function') return url;
+    return signer.call(this.s3, url, ownerId);
+  }
+
+  private async toCard(r: StoryRow): Promise<StoryCard> {
+    const [mediaUrl, authorAvatarUrl] = await Promise.all([
+      this.signMediaUrl(r.media_url, r.author_id),
+      this.signMediaUrl(r.avatar_url, r.author_id),
+    ]);
     return {
       id: r.id,
       authorId: r.author_id,
       authorDisplayName: r.display_name,
-      authorAvatarUrl: r.avatar_url,
+      authorAvatarUrl,
       authorVerification: r.verification_level,
-      mediaUrl: r.media_url,
+      mediaUrl: mediaUrl ?? r.media_url,
       mediaType: r.media_type,
       caption: r.caption,
       approxLocation: { lat: Number(r.approx_lat), lng: Number(r.approx_lng) },

@@ -542,3 +542,33 @@ describe('UsersService — deleteAccount', () => {
     expect(runnerQuery).not.toHaveBeenCalled();
   });
 });
+
+
+describe('UsersService — private S3 media delivery', () => {
+  it('returns a signed URL for a photo owned by the requested user', async () => {
+    const userId = '11111111-1111-4111-8111-111111111111';
+    const mediaUrl = 'https://g88-uploads-dev.s3.eu-north-1.amazonaws.com/photos/11111111-1111-4111-8111-111111111111/photo.jpg';
+    const signedUrl = 'https://signed.example/read';
+    const query = jest.fn().mockResolvedValue([
+      { id: 'photo-1', url: mediaUrl, position: 0, created_at: new Date().toISOString() },
+    ]);
+    const mediaReadUrl = jest.fn().mockResolvedValue(signedUrl);
+    const mod = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: getDataSourceToken(), useValue: { query } as unknown as DataSource },
+        { provide: PresenceService, useValue: {} },
+        { provide: MessagingService, useValue: {} },
+        { provide: S3Service, useValue: { mediaReadUrl } },
+        { provide: BlocksService, useValue: {} },
+      ],
+    }).compile();
+    const service = mod.get(UsersService);
+
+    const photos = await service.listPhotos(userId);
+
+    expect(photos[0]?.url).toBe(signedUrl);
+    expect(mediaReadUrl).toHaveBeenCalledWith(mediaUrl, userId);
+  });
+});
+
