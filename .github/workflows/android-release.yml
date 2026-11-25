@@ -13,7 +13,7 @@ on:
         required: false
         default: "alpha"
       version_code:
-        description: "Optional explicit Android versionCode (RC2 internal: 6); empty uses workflow run number"
+        description: "Optional explicit Android versionCode (NEXUS RC2: 13, subject to Play Console max check); empty uses workflow run number"
         required: false
         default: ""
       publish:
