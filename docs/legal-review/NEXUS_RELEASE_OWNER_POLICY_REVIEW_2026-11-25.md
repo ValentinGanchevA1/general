@@ -101,6 +101,15 @@ The current Terms draft explicitly remains unapproved and contains unresolved pl
 - Subscription/payment, refunds and consumer-law terms only if relevant to the actual Release.
 - Governing law, dispute resolution, liability, termination, account deletion and legally required retention. These are counsel decisions.
 
+### Staging and database security facts (read-only, 25 Nov 2026)
+
+- Supabase `G88` and `NEXUS-STAGING` are separate projects with distinct project refs and database hosts in `eu-west-1`. Both report `ACTIVE_HEALTHY`.
+- `NEXUS-STAGING` currently has no public application tables, no `users` table, no app `schema_migrations` table and no Supabase migration history. Only default Supabase-managed schemas exist. The database is an empty foundation, not yet a usable NEXUS staging backend.
+- `G88` has 85 rows in `public.schema_migrations`, applied from 23 May to 8 Nov 2026. The merged offline PR #1092 recorded 85 applied filenames vs 70 checkout migrations at its historical commit, with 15 mismatches. Re-run against current master; do not copy/alias missing history or replay SQL blindly.
+- Supabase table metadata reports RLS disabled on 65 public tables. Read-only PostgreSQL privilege checks found no direct SELECT/INSERT/UPDATE/DELETE privileges for `anon` or `authenticated` on those RLS-disabled tables, including sensitive examples, and no public SECURITY DEFINER functions executable by those roles. Thus current direct exposure via standard Supabase client roles was not confirmed; disabled RLS remains a defense-in-depth risk if grants change later. Do not bulk-enable RLS: table-specific policies and backend regression tests are required.
+- Render still has only one NEXUS API service (`g88-api`); a distinct staging API deployment is absent. Its `DATABASE_URL` and Redis target are not readable through connected Render tools. Create/deploy a separate API that targets NEXUS-STAGING only after migration reconciliation and isolated credential setup; do not change the live service.
+- No application schema, RLS flags, table grants, production rows, Render variables or migrations were changed during these checks.
+
 ### Terms acceptance engineering dependency
 The current mobile `TERMS_OF_SERVICE_URL` still equals the Privacy URL `https://g88-legal.onrender.com/privacy`; no dedicated `docs/legal/terms/index.html` exists on master. PR #1067 is stale/diverged (93 commits ahead of an old base and 59 behind current master) and not mergeable. It must be split/rebased and revalidated; do not merge it wholesale or replay migration 0072 without isolated staging and migration-history review.
 
@@ -158,12 +167,13 @@ Owner must also decide whether an alternate responder/backup exists, what covera
 | 18+ backend | DB-backed service + REST/Socket.IO guards exist; Render maps age endpoints | Source/startup evidence only |
 | 18+ mobile bootstrap | Draft PR #1174; CI, security scans and Android sideload build passed | Not merged/deployed; age-gate device tests NOT RUN |
 | Dating OFF | Draft PR #1173; backend/mobile fail-closed work; Android APK and iOS compile checks still running at latest review | Not merged/deployed |
-| Isolated staging | No separate NEXUS staging API/DB/Redis demonstrated in connected Render workspace | BLOCKED |
+| Isolated staging | Separate Supabase project NEXUS-STAGING exists (ACTIVE_HEALTHY, different DB host from G88), but it has 0 public application tables and no app migration history; Render has no separate NEXUS staging API service; staging Redis/storage/OAuth/push/email remain unverified | BLOCKED — foundation exists, not provisioned |
 | Terms page/acceptance | Dedicated /terms page absent on master; stale PR #1067 | BLOCKED |
 | Child Safety page | Candidate only in Draft PR #1140; auto-publish risk on merge | BLOCKED |
 | Child Safety runtime | CS-01–CS-12 not run on signed release build/API | BLOCKED |
 | Child Safety email | Cloudflare verified destination/rule created, but zone and Email Routing are inactive | NOT OPERATIONAL |
 | Play Console declarations | Must be checked in authenticated Play Console against exact signed AAB | NOT VERIFIED |
+| G88 database RLS | Supabase reports RLS disabled on 65 of 66 public tables; read-only grants check found 0 direct table privileges for anon/authenticated and 0 public SECURITY DEFINER functions executable by those roles | Defense-in-depth gap; do not bulk-enable without policies and regression tests |
 
 ## 8. Owner Release-candidate approval checklist
 
