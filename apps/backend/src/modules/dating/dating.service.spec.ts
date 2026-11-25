@@ -44,6 +44,13 @@ describe('DatingService release gate', () => {
     expect(isBlocked).not.toHaveBeenCalled();
   });
 
+  it('does not enable Dating from the legacy flag alone', async () => {
+    process.env.NEXUS_DATING_ENABLED = 'true';
+    await expect(service.like('user-a', { toUserId: 'user-b' })).rejects.toBeInstanceOf(NotFoundException);
+    expect(isBlocked).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('allows service entry only after an explicit server opt-in', async () => {
     process.env.NEXUS_DATING_ENABLED = 'true';
     process.env.NEXUS_DATING_RC1_APPROVED = 'true';
