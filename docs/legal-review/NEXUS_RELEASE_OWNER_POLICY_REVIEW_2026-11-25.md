@@ -105,6 +105,7 @@ The current Terms draft explicitly remains unapproved and contains unresolved pl
 
 - Supabase `G88` and `NEXUS-STAGING` are separate projects with distinct project refs and database hosts in `eu-west-1`. Both report `ACTIVE_HEALTHY`.
 - `NEXUS-STAGING` currently has no public application tables, no `users` table, no app `schema_migrations` table and no Supabase migration history. Only default Supabase-managed schemas exist. The database is an empty foundation, not yet a usable NEXUS staging backend.
+- Fresh Render metadata on 25 Nov shows `g88-api` Auto Deploy OFF, `pullRequestPreviewsEnabled=no`, `previews.generation=off`, and no `g88-api PR #...` services among the 4 services in the workspace. This is current containment evidence, not proof of historical preview DB targets or migration provenance.
 - `G88` has 85 rows in `public.schema_migrations`, applied from 23 May to 8 Nov 2026. The merged offline PR #1092 recorded 85 applied filenames vs 70 checkout migrations at its historical commit, with 15 mismatches. Re-run against current master; do not copy/alias missing history or replay SQL blindly.
 - A fresh read-only comparison against current GitHub `master` on 25 Nov confirms **70 migration SQL files in checkout vs 85 filenames in G88**, with exactly these 15 applied filenames absent from current master:
   - Applied 8 Sep: `0036_trade_offer_counter.sql`, `0037_conversation_kind_members.sql`, `0038_user_strikes.sql`.
@@ -177,14 +178,25 @@ Owner must also decide whether an alternate responder/backup exists, what covera
 | Existing Android core flows | Owner-confirmed Huawei Nova 11 tests for Storyline, Check-in, Chat, Map and Events on Build #2523 | PASS (owner-reported) |
 | 18+ backend | DB-backed service + REST/Socket.IO guards exist; Render maps age endpoints | Source/startup evidence only |
 | 18+ mobile bootstrap | Draft PR #1174; CI, security scans and Android sideload build passed | Not merged/deployed; age-gate device tests NOT RUN |
-| Dating OFF | Draft PR #1173; backend/mobile fail-closed work; Android APK and iOS compile checks still running at latest review | Not merged/deployed |
+| Dating OFF | Draft PR #1173 head 23d8b53; CI, ESLint, CodeQL, Semgrep, AWS policy validation and DeepScan PASS; Android APK build PASS; iOS MapLibre Build still in progress | Not merged/deployed; APK is client-only QA, backend not live |
 | Isolated staging | Separate Supabase project NEXUS-STAGING exists (ACTIVE_HEALTHY, different DB host from G88), but it has 0 public application tables and no app migration history; Render has no separate NEXUS staging API service; staging Redis/storage/OAuth/push/email remain unverified | BLOCKED — foundation exists, not provisioned |
 | Terms page/acceptance | Dedicated /terms page absent on master; stale PR #1067 | BLOCKED |
 | Child Safety page | Candidate only in Draft PR #1140; auto-publish risk on merge | BLOCKED |
 | Child Safety runtime | CS-01–CS-12 not run on signed release build/API | BLOCKED |
 | Child Safety email | Cloudflare verified destination/rule created, but zone and Email Routing are inactive | NOT OPERATIONAL |
 | Play Console declarations | Must be checked in authenticated Play Console against exact signed AAB | NOT VERIFIED |
+| Docs PR #1176 | Play checklist + owner review packet updated with Aug 2026 policy scope, staging and migration evidence | CI, ESLint, CodeQL, Semgrep, AWS policy validation and DeepScan PASS; still Draft |
 | G88 database RLS | Supabase reports RLS disabled on 65 of 66 public tables; read-only grants check found 0 direct table privileges for anon/authenticated and 0 public SECURITY DEFINER functions executable by those roles | Defense-in-depth gap; do not bulk-enable without policies and regression tests |
+
+### 7.1 Android Dating OFF sideload QA candidate — not a Release candidate
+
+- Workflow run: [Android Build #45595846300](https://github.com/ValentinGanchevA1/general/actions/runs/45595846300), SUCCESS; artifact ID 15014029319 (g88-sideload-apk).
+- Artifact ZIP SHA-256: fd3c259538d38f17844df4216adf721a0cf13a70ed150995facf4023213f8331.
+- Extracted APK SHA-256: f13d84cee128e5e3d1ea6c7e0df3c51f3d26b9f19fcd0ce91472f3ee86042c2b.
+- APK metadata: package com.g88; versionName 1.0.0; versionCode 2540; targetSdk 36; minSdk 24; JS bundle at assets/index.android.bundle.
+- Final packaged manifest has no READ_MEDIA_IMAGES, READ_MEDIA_VIDEO or ACCESS_BACKGROUND_LOCATION; fine/coarse location and camera/microphone permissions remain. WRITE_EXTERNAL_STORAGE is present in the merged manifest and must stay documented for Play review.
+- APK v2 signing block certificate fingerprint: 24f27aff192ee0a93b04f863f093a79adf776a0ea86ff6df097191ab75ec823b; the same certificate is embedded in the previously inspected master APK and PR #1166 APK.
+- Scope limitation: this artifact contains PR #1173's client-side Dating UI gate only. It does not include PR #1174 mobile 18+ bootstrap, and the #1173 backend changes are not deployed to Render. It is not a complete server-enforced Dating OFF / Social 18+ build, not an AAB, and not Play-ready. Restrict its use to owner-controlled local QA with test accounts; do not treat it as evidence of backend policy enforcement.
 
 ## 8. Owner Release-candidate approval checklist
 
