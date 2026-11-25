@@ -1,0 +1,33 @@
+name: Staging Isolation Offline Audit
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend/scripts/staging-isolation-preflight.cjs'
+      - 'apps/backend/scripts/staging-isolation-preflight.test.cjs'
+      - '.github/workflows/staging-isolation-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+      - name: Run offline preflight unit tests
+        run: node --test apps/backend/scripts/staging-isolation-preflight.test.cjs
+      - name: Confirm CLI does not authorize deploy
+        run: |
+          if env -u DATABASE_URL -u NEXUS_STAGING_DATABASE_URL -u REDIS_URL -u NEXUS_STAGING_REDIS_URL node apps/backend/scripts/staging-isolation-preflight.cjs >/tmp/staging-audit.json 2>/tmp/staging-audit.err; then
+            echo 'Unexpected successful preflight exit'
+            exit 1
+          fi
+          node -e "const x=require('/tmp/staging-audit.json'); if(x.status!=='BLOCKED')process.exit(1)"
