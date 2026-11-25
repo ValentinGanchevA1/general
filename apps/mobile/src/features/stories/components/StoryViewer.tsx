@@ -237,7 +237,8 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
             delayLongPress={150}
           />
           {current.mediaType === 'image' ? (
-            <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" onLoad={() => setImageFailed(false)} onError={() => { setImageFailed(true); console.warn("[StoryViewer] image media load failed"); }} />\n            {imageFailed ? <View style={[StyleSheet.absoluteFillObject, styles.videoFailed]}><Text style={styles.videoFailedTitle}>Image unavailable</Text><Text style={styles.videoFailedBody}>This story media could not be loaded.</Text></View> : null}
+            <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" onLoad={() => setImageFailed(false)} onError={() => { setImageFailed(true); console.warn("[StoryViewer] image media load failed"); }} />
+            {imageFailed ? <View style={[StyleSheet.absoluteFillObject, styles.videoFailed]}><Text style={styles.videoFailedTitle}>Image unavailable</Text><Text style={styles.videoFailedBody}>This story media could not be loaded.</Text></View> : null}
           ) : (
             <>
               <Video
