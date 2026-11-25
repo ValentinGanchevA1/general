@@ -63,6 +63,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
   const [videoBuffering, setVideoBuffering] = useState(false);
   /** Bump to remount <Video> after Retry. */
   const [videoEpoch, setVideoEpoch] = useState(0);
+  const [imageFailed, setImageFailed] = useState(false);
   const chromeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<BottomSheetModal>(null);
   const optionsSnap = useMemo(() => ['22%'], []);
@@ -115,7 +116,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
       setVideoReady(mediaType !== 'video');
       setVideoFailed(false);
       setVideoBuffering(false);
-      setVideoEpoch(0);
+      setVideoEpoch(0);\n      setImageFailed(false);
     });
     if (chromeTimer.current) clearTimeout(chromeTimer.current);
     chromeTimer.current = setTimeout(() => setChromeDimmed(true), 1_200);
@@ -235,7 +236,7 @@ export function StoryViewer({ stories, initialIndex, visible, onClose }: Props) 
             delayLongPress={150}
           />
           {current.mediaType === 'image' ? (
-            <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" />
+            <Image source={{ uri: current.mediaUrl }} style={styles.media} resizeMode="cover" onLoad={() => setImageFailed(false)} onError={() => { setImageFailed(true); console.warn("[StoryViewer] image media load failed"); }} />\n            {imageFailed ? <View style={[StyleSheet.absoluteFillObject, styles.videoFailed]}><Text style={styles.videoFailedTitle}>Image unavailable</Text><Text style={styles.videoFailedBody}>This story media could not be loaded.</Text></View> : null}
           ) : (
             <>
               <Video
