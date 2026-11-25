@@ -227,7 +227,7 @@ export function MapScreen(): React.JSX.Element {
 		viewport,
 		zoom,
 		kinds,
-		listingMode: peopleLayer && (friendsOnly || datingOnly) ? undefined : listingsLayer ? listingMode : undefined,
+		listingMode: peopleLayer && (friendsOnly || effectiveDatingOnly) ? undefined : listingsLayer ? listingMode : undefined,
 		friendsOnly: peopleLayer && friendsOnly,
 		datingOnly: effectiveDatingOnly && peopleLayer && !friendsOnly,
 		rankBy,
