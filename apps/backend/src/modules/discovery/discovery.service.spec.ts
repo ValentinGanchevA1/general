@@ -39,6 +39,12 @@ type LoosePoint = {
 const asPoints = (ps: unknown): LoosePoint[] => ps as LoosePoint[];
 
 describe('DiscoveryService', () => {
+  const previousDatingFlag = process.env.NEXUS_DATING_ENABLED;
+  beforeAll(() => { process.env.NEXUS_DATING_ENABLED = 'true'; });
+  afterAll(() => {
+    if (previousDatingFlag === undefined) delete process.env.NEXUS_DATING_ENABLED;
+    else process.env.NEXUS_DATING_ENABLED = previousDatingFlag;
+  });
   let service: DiscoveryService;
   let query: jest.Mock;
   let whichAreOnline: jest.Mock;
