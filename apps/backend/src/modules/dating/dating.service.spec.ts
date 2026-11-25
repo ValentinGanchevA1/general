@@ -4,7 +4,8 @@ import { DataSource } from 'typeorm';
 import { DatingService } from './dating.service';
 
 describe('DatingService release gate', () => {
-  const original = process.env.NEXUS_DATING_ENABLED;
+  const originalEnabled = process.env.NEXUS_DATING_ENABLED;
+  const originalApproval = process.env.NEXUS_DATING_RC1_APPROVED;
   let service: DatingService;
   let query: jest.Mock;
   let transaction: jest.Mock;
@@ -12,6 +13,7 @@ describe('DatingService release gate', () => {
 
   beforeEach(() => {
     delete process.env.NEXUS_DATING_ENABLED;
+    delete process.env.NEXUS_DATING_RC1_APPROVED;
     query = jest.fn();
     transaction = jest.fn();
     isBlocked = jest.fn();
@@ -23,8 +25,10 @@ describe('DatingService release gate', () => {
   });
 
   afterAll(() => {
-    if (original === undefined) delete process.env.NEXUS_DATING_ENABLED;
-    else process.env.NEXUS_DATING_ENABLED = original;
+    if (originalEnabled === undefined) delete process.env.NEXUS_DATING_ENABLED;
+    else process.env.NEXUS_DATING_ENABLED = originalEnabled;
+    if (originalApproval === undefined) delete process.env.NEXUS_DATING_RC1_APPROVED;
+    else process.env.NEXUS_DATING_RC1_APPROVED = originalApproval;
   });
 
   it('blocks like before any DB or block lookup when disabled', async () => {
@@ -42,6 +46,7 @@ describe('DatingService release gate', () => {
 
   it('allows service entry only after an explicit server opt-in', async () => {
     process.env.NEXUS_DATING_ENABLED = 'true';
+    process.env.NEXUS_DATING_RC1_APPROVED = 'true';
     isBlocked.mockResolvedValue(true);
     await expect(service.like('user-a', { toUserId: 'user-b' })).rejects.toMatchObject({
       response: { code: 'dating.like.blocked' },
