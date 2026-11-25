@@ -67,6 +67,7 @@ import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { AdultEligibilityService, adultAgeGateEnabled } from '../modules/auth/adult-eligibility.service';
 import { corsOrigins } from '../common/cors-origins';
+import { datingFeatureEnabled } from '../modules/dating/dating-feature';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 type G88Socket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -668,6 +669,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       createdAt: string;
     },
   ): Promise<void> {
+    if (!datingFeatureEnabled()) return;
     this.server.to(this.userRoom(toUserId)).emit('dating:match_created', evt);
   }
 
@@ -683,6 +685,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       createdAt: string;
     },
   ): Promise<void> {
+    if (!datingFeatureEnabled()) return;
     this.server.to(this.userRoom(toUserId)).emit('dating:like_received', evt);
   }
 
