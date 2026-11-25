@@ -173,6 +173,8 @@ jobs:
             exit 1
           fi
           echo "ANDROID_RELEASE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "SENTRY_RELEASE=com.g88@1.0.1+$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "SENTRY_DIST=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "::notice::Building Android versionCode $VERSION_CODE; verify it exceeds all Play Console uploads."
 
       - name: Check merged release manifest for forbidden media permissions
@@ -181,9 +183,6 @@ jobs:
           ./gradlew checkReleaseMediaPermissions --no-daemon --init-script ci-init.gradle
 
       - name: Build signed release AAB
-        env:
-          SENTRY_RELEASE: com.g88@1.0.1+${{ env.ANDROID_RELEASE_VERSION_CODE }}
-          SENTRY_DIST: ${{ env.ANDROID_RELEASE_VERSION_CODE }}
         run: |
           cd android
           ATTEMPTS=5
