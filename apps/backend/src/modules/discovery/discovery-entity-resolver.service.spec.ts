@@ -13,10 +13,16 @@ const context = {
 
 describe('DiscoveryEntityResolver', () => {
   const previousDatingFlag = process.env.NEXUS_DATING_ENABLED;
-  beforeAll(() => { process.env.NEXUS_DATING_ENABLED = 'true'; });
+  const previousDatingApproval = process.env.NEXUS_DATING_RC1_APPROVED;
+  beforeAll(() => {
+    process.env.NEXUS_DATING_ENABLED = 'true';
+    process.env.NEXUS_DATING_RC1_APPROVED = 'true';
+  });
   afterAll(() => {
     if (previousDatingFlag === undefined) delete process.env.NEXUS_DATING_ENABLED;
     else process.env.NEXUS_DATING_ENABLED = previousDatingFlag;
+    if (previousDatingApproval === undefined) delete process.env.NEXUS_DATING_RC1_APPROVED;
+    else process.env.NEXUS_DATING_RC1_APPROVED = previousDatingApproval;
   });
   let resolver: DiscoveryEntityResolver;
   let query: jest.Mock;
