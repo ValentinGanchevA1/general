@@ -23,6 +23,7 @@ import {
 import { REDIS_CLIENT } from '../../config/redis.provider';
 import { PresenceService } from '../presence/presence.service';
 import { FriendsService } from '../friends/friends.service';
+import { assertDatingFeatureEnabled } from '../dating/dating-feature';
 import { buildDiscoveryDiffFromSnapshot } from './discoveryDiff';
 import { completeClusterCoverage, type ClusterCoverage } from './cluster-coverage';
 import { buildRelevanceTopKSql } from './ranking/sql-topk';
@@ -112,6 +113,7 @@ export class DiscoveryService {
     rankBy?: DiscoveryRankBy;
   }): Promise<DiscoveryResponse> {
     const friendsOnly = params.friendsOnly === true;
+    if (params.datingOnly === true && !friendsOnly) assertDatingFeatureEnabled();
     /** Dating mode wins only when friends-only is off. */
     const datingOnly = params.datingOnly === true && !friendsOnly;
     const rankBy: DiscoveryRankBy = params.rankBy ?? 'relevance';
