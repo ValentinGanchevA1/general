@@ -24,8 +24,8 @@ test('historical manifest retains 15 source candidates while 14 remain absent fr
   assert.equal(entries.length, 15);
   assert.deepEqual(
     entries.map((r) => r.filename).sort(),
-    [...snapshot].sort(),
-    'historical manifest must retain every owner-snapshot candidate',
+    [...Object.keys(HISTORICAL), '0076_child_safety_report_reason.sql'].sort(),
+    'historical manifest must retain all original drift candidates, including restored 0076',
   );
   assert.equal(unresolvedEntries.length, 14);
   assert.deepEqual(
