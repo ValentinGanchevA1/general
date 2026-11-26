@@ -12,6 +12,7 @@ interface TermsAcceptanceState extends UgcTermsAcceptanceStatus {
   phase: TermsAcceptancePhase;
   error: string | null;
   activeRequestId: string | null;
+  deferredForSession: boolean;
 }
 
 const initialState: TermsAcceptanceState = {
@@ -19,6 +20,7 @@ const initialState: TermsAcceptanceState = {
   phase: 'idle',
   error: null,
   activeRequestId: null,
+  deferredForSession: false,
   required: false,
   accepted: false,
   termsVersion: null,
@@ -97,7 +99,11 @@ function setRequest(
 const termsAcceptanceSlice = createSlice({
   name: 'termsAcceptance',
   initialState,
-  reducers: {},
+  reducers: {
+    deferTermsForSession(state) {
+      state.deferredForSession = true;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(checkUgcTermsAcceptance.pending, (state, action) => {
@@ -150,5 +156,7 @@ const termsAcceptanceSlice = createSlice({
       );
   },
 });
+
+export const { deferTermsForSession } = termsAcceptanceSlice.actions;
 
 export default termsAcceptanceSlice.reducer;

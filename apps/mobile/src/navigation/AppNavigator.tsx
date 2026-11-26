@@ -65,7 +65,7 @@ import { TermsAcceptanceScreen } from '@/screens/TermsAcceptanceScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 import { canEnterSocial, checkAgeEligibility } from '@/features/auth/ageEligibilitySlice';
-import { canContinueWithTerms, checkUgcTermsAcceptance } from '@/features/auth/termsAcceptanceSlice';
+import { canContinueWithTerms, checkUgcTermsAcceptance, deferTermsForSession } from '@/features/auth/termsAcceptanceSlice';
 import { placeDeepLinkQueue } from '@/features/places/placeDeepLink';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
@@ -390,7 +390,7 @@ export function AppNavigator(): React.JSX.Element {
 	const ageReady = canEnterSocial(userId, ageGate);
 	const termsGate = useAppSelector((s) => s.termsAcceptance);
 	const termsReady = canContinueWithTerms(userId, termsGate);
-	const [termsDeferred, setTermsDeferred] = useState(false);
+	const termsDeferred = termsGate.deferredForSession;
 	const worldModes = useAppSelector((s) => s.worldModes);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
@@ -407,7 +407,6 @@ export function AppNavigator(): React.JSX.Element {
 		if (!userId || restoring || (ageGate.userId === userId && ageGate.phase !== 'idle')) return;
 		void dispatch(checkAgeEligibility(userId));
 	}, [dispatch, userId, restoring, ageGate.userId, ageGate.phase]);
-	useEffect(() => { setTermsDeferred(false); }, [userId]);
 	useEffect(() => {
 		if (!userId || restoring || !ageReady || (termsGate.userId === userId && termsGate.phase !== 'idle')) return;
 		void dispatch(checkUgcTermsAcceptance(userId));
@@ -453,7 +452,7 @@ export function AppNavigator(): React.JSX.Element {
 		return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading your NEXUS preferences" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	}
 	const renderTermsAcceptance = (): React.JSX.Element => (
-		<TermsAcceptanceScreen onContinueWithoutPosting={() => setTermsDeferred(true)} />
+		<TermsAcceptanceScreen onContinueWithoutPosting={() => dispatch(deferTermsForSession())} />
 	);
 	return <View style={{ flex: 1 }}><NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>

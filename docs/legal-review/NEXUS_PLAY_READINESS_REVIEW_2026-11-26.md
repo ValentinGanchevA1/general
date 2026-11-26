@@ -32,7 +32,7 @@ Google requires published CSAE standards, accessible in-app feedback, appropriat
 - Adds a read-only continuation for users who decline, preserving report/block/account controls; the app surfaces a Terms reminder while UGC creation, upload, profile edits and message sending remain blocked by the server.
 - Adds durable evidence containing account id, Terms version, SHA-256 and server timestamp only; no IP address or user agent is stored.
 - Adds explicit opt-in enforcement (`NEXUS_REQUIRE_UGC_TERMS`) and fails closed if enabled with missing or conflicting version/hash configuration.
-- Adds migration 0072. It is unused until staged; the feature is not merged or deployed. Privacy/Data Safety wording must disclose the acceptance record before activation.
+- Adds migration 0078 rather than reusing the `0072_ugc_terms_acceptance.sql` name present in the unverified owner-supplied history snapshot. This keeps filename-only migration tracking from silently treating the new schema as applied; history reconciliation remains blocking. The migration is unused until staged; the feature is not merged or deployed. Privacy/Data Safety wording must disclose the acceptance record before activation.
 
 ## Play Console status
 
@@ -52,7 +52,7 @@ Open declaration decisions include category/target audience, random-connection/m
 1. Qualified legal/safety review, product-owner fact approval and exact immutable approval hashes for Terms and Child Safety.
 2. Follow the repository Terms publication guide, publish only through a reviewed PR and verify anonymous HTTPS contents and digest.
 3. Verify the child-safety mailbox, backup coverage, report-to-moderation path, CSAM handling and applicable reporting procedure.
-4. Merge/stage migration 0072 and deploy the backend API before the mobile build; run acceptance, stale-version, direct HTTP/WebSocket bypass, report, block and account deletion tests.
+4. Merge/stage migration 0078 and deploy the backend API before the mobile build; run acceptance, stale-version, direct HTTP/WebSocket bypass, report, block and account deletion tests.
 5. Update Privacy/Data Safety and complete truthful Console declarations against the exact signed AAB and deployed configuration.
 6. Produce a current signed AAB, compare its version/signing with Play Console, install the AAB-derived build or Play-installed release on the connected device, and capture QA evidence.
 7. Keep production NO-GO until the legal text, public URLs, backend, Data Safety answers, Console declarations and exact device-tested AAB agree.

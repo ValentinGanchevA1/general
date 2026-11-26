@@ -15,20 +15,20 @@ const appliedFiles = readOwnerSnapshot(
   path.join(__dirname, 'fixtures', 'migration-history-owner-20261110.txt'),
 );
 
-test('owner-supplied history matches 85 applied / 71 checkout / 14 remaining historical names', () => {
+test('owner history stays unchanged and the new acceptance migration is surfaced as unrecorded', () => {
   const report = auditMigrationHistory(appliedFiles, localFiles);
   assert.equal(report.appliedCount, 85);
-  assert.equal(report.checkoutCount, 71);
+  assert.equal(report.checkoutCount, 72);
   assert.equal(report.missingFromCheckoutCount, 14);
   assert.deepEqual(
     report.missingFromCheckout.map(({ filename }) => filename),
     Object.keys(HISTORICAL).sort(),
   );
-  assert.deepEqual(report.checkoutFilesNotRecorded, []);
+  assert.deepEqual(report.checkoutFilesNotRecorded, ['0078_user_terms_acceptance.sql']);
   assert.deepEqual(report.duplicatePrefixes, [
     '0036', '0037', '0038', '0051', '0054', '0072', '0073',
   ]);
-  assert.equal(report.matchesOwnerSnapshot, true);
+  assert.equal(report.matchesOwnerSnapshot, false);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
   assert.ok(!Object.hasOwn(report, 'migrationRunnerUnchanged'));
@@ -61,7 +61,11 @@ test('changed checkout breaks snapshot match; not-applied migration is surfaced'
     [...localFiles, '0078_new_schema.sql'],
   );
   assert.equal(report.matchesOwnerSnapshot, false);
-  assert.deepEqual(report.checkoutFilesNotRecorded, ['0001_initial.sql', '0078_new_schema.sql']);
+  assert.deepEqual(report.checkoutFilesNotRecorded, [
+    '0001_initial.sql',
+    '0078_new_schema.sql',
+    '0078_user_terms_acceptance.sql',
+  ]);
 });
 
 test('invalid filenames and duplicated metadata fail instead of being interpreted', () => {
@@ -99,15 +103,17 @@ test('actual migration guard still refuses all 14 remaining mismatches before wr
   assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
 });
 
-test('offline CLI always exits nonzero and reports BLOCKED even on matching fixture', () => {
+test('offline CLI exits nonzero and reports the unrecorded migration as BLOCKED', () => {
   const cli = spawnSync(process.execPath, [
     path.join(__dirname, 'migration-reconciliation-report.cjs'),
   ], { encoding: 'utf8', timeout: 5000, env: {} });
   assert.equal(cli.status, 2);
   assert.equal(cli.stderr, '');
   const report = JSON.parse(cli.stdout);
-  assert.equal(report.matchesOwnerSnapshot, true);
+  assert.equal(report.matchesOwnerSnapshot, false);
+  assert.equal(report.checkoutCount, 72);
   assert.equal(report.missingFromCheckoutCount, 14);
+  assert.deepEqual(report.checkoutFilesNotRecorded, ['0078_user_terms_acceptance.sql']);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
 });
