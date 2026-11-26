@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   linkButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   linkText: { fontSize: fontSize.md, fontWeight: '600', textDecorationLine: 'underline' },
   checkRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  checkbox: { width: 26, height: 26, borderWidth: 2, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 26, height: 26, borderWidth: 2, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   checkmark: { fontSize: fontSize.md, fontWeight: '700' },
   checkLabel: { flex: 1, fontSize: fontSize.sm, lineHeight: 20 },
   error: { fontSize: fontSize.sm, lineHeight: 20 },

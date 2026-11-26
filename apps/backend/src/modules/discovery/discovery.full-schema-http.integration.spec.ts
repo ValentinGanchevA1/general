@@ -24,6 +24,7 @@ import { AuthController } from '../auth/auth.controller';
 import { AdultEligibilityService } from '../auth/adult-eligibility.service';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { PasswordResetService } from '../auth/password-reset.service';
+import { UgcTermsAcceptanceService } from '../auth/ugc-terms-acceptance.service';
 import { FriendsService } from '../friends/friends.service';
 import { FriendsNotifyService } from '../friends/friends-notify.service';
 import { BlocksService } from '../blocks/blocks.service';
@@ -218,6 +219,7 @@ suite('NEXA full migrated PostGIS + JWT login + real Friends + Redis/HTTP', () =
           inject: [getDataSourceToken(), PresenceService],
         },
         { provide: PasswordResetService, useValue: {} },
+        { provide: UgcTermsAcceptanceService, useValue: {} },
         { provide: PlaceMapDiscoveryService, useValue: {} },
       ],
     }).compile();
