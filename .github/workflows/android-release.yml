@@ -78,6 +78,7 @@ jobs:
         working-directory: .
 
       - name: Guard production legal URLs
+        if: inputs.publish == true
         env:
           NEXA_PLAY_TRACK: ${{ inputs.track || 'alpha' }}
           # Exact immutable version approved by counsel and configured for backend Terms acceptance.
@@ -183,6 +184,9 @@ jobs:
           ./gradlew checkReleaseMediaPermissions --no-daemon --init-script ci-init.gradle
 
       - name: Build signed release AAB
+        env:
+          SENTRY_RELEASE: ${{ env.SENTRY_RELEASE }}
+          SENTRY_DIST: ${{ env.SENTRY_DIST }}
         run: |
           cd android
           ATTEMPTS=5
