@@ -15,11 +15,11 @@ const appliedFiles = readOwnerSnapshot(
   path.join(__dirname, 'fixtures', 'migration-history-owner-20261110.txt'),
 );
 
-test('owner-supplied history matches exactly 85 applied / 70 checkout / 15 unknown names', () => {
+test('owner-supplied history matches 85 applied / 71 checkout / 14 remaining historical names', () => {
   const report = auditMigrationHistory(appliedFiles, localFiles);
   assert.equal(report.appliedCount, 85);
-  assert.equal(report.checkoutCount, 70);
-  assert.equal(report.missingFromCheckoutCount, 15);
+  assert.equal(report.checkoutCount, 71);
+  assert.equal(report.missingFromCheckoutCount, 14);
   assert.deepEqual(
     report.missingFromCheckout.map(({ filename }) => filename),
     Object.keys(HISTORICAL).sort(),
@@ -46,7 +46,7 @@ test('five apparent renames do not authorize migration runner or claim SQL execu
 
 test('unknown new migration fails inventory match, never silently gets whitelisted', () => {
   const report = auditMigrationHistory([...appliedFiles, '0099_surprise_draft.sql'], localFiles);
-  assert.equal(report.missingFromCheckoutCount, 16);
+  assert.equal(report.missingFromCheckoutCount, 15);
   assert.equal(report.matchesOwnerSnapshot, false);
   assert.equal(
     report.missingFromCheckout.find((row) => row.filename === '0099_surprise_draft.sql').kind,
@@ -73,7 +73,7 @@ test('invalid filenames and duplicated metadata fail instead of being interprete
   assert.throws(() => auditMigrationHistory(appliedFiles, [...localFiles, 'not-a-migration']), /invalid/);
 });
 
-test('actual production migration guard still refuses all 15 mismatches before writes', async () => {
+test('actual migration guard still refuses all 14 remaining mismatches before writes', async () => {
   const queries = [];
   const db = {
     async query(sql) {
@@ -93,7 +93,7 @@ test('actual production migration guard still refuses all 15 mismatches before w
       '0047_personal_activity_notifications.sql',
       '0048_personal_activity_notifications.sql',
     ]),
-    (err) => err.code === 'MIGRATION_HISTORY_DRIFT' && /15 applied/.test(err.message),
+    (err) => err.code === 'MIGRATION_HISTORY_DRIFT' && /14 applied/.test(err.message),
   );
   assert.equal(queries.length, 2);
   assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
@@ -107,7 +107,7 @@ test('offline CLI always exits nonzero and reports BLOCKED even on matching fixt
   assert.equal(cli.stderr, '');
   const report = JSON.parse(cli.stdout);
   assert.equal(report.matchesOwnerSnapshot, true);
-  assert.equal(report.missingFromCheckoutCount, 15);
+  assert.equal(report.missingFromCheckoutCount, 14);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
 });

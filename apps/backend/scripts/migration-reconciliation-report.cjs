@@ -25,7 +25,6 @@ const HISTORICAL = Object.freeze({
   '0073_extend_content_report_targets.sql': { kind: 'unmerged-feature-migration', source: 'draft PR #1066, renamed' },
   '0074_event_question_moderation.sql': { kind: 'unmerged-feature-migration', source: 'draft PR #1066, renamed' },
   '0075_dating_match_conversation_lookup.sql': { kind: 'unmerged-feature-migration', source: 'draft PR #1066' },
-  '0076_child_safety_report_reason.sql': { kind: 'unmerged-feature-migration', source: 'draft PR #1066' },
   '0077_adult_only_rc1_visibility.sql': { kind: 'unmerged-feature-migration', source: 'draft PR #1066: retain adult privacy invariant' },
 });
 
@@ -71,7 +70,7 @@ function auditMigrationHistory(appliedFiles, localFiles) {
   const observedNames = missingFromCheckout.map((item) => item.filename);
   const matchesOwnerSnapshot =
     applied.size === 85 &&
-    local.size === 70 &&
+    local.size === 71 &&
     notAppliedOnSnapshot.length === 0 &&
     JSON.stringify(expectedNames) === JSON.stringify(observedNames);
 

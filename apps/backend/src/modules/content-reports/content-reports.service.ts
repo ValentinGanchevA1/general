@@ -62,13 +62,15 @@ export class ContentReportsService {
       `SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.reason, r.status,
          r.created_at, r.reviewed_at,
          COALESCE(tu.display_name, au.display_name) AS target_display_name,
-         s.caption AS target_caption, s.media_url AS target_media_url
+         CASE WHEN r.reason = 'child_safety' THEN NULL ELSE s.caption END AS target_caption,
+         CASE WHEN r.reason = 'child_safety' THEN NULL ELSE s.media_url END AS target_media_url
        FROM content_abuse_reports r
        LEFT JOIN users tu ON r.target_type = 'user' AND tu.id = r.target_id
        LEFT JOIN stories s ON r.target_type = 'story' AND s.id = r.target_id
        LEFT JOIN users au ON au.id = s.author_id
        WHERE r.status = $1
-       ORDER BY r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`,
+       ORDER BY CASE WHEN r.reason = 'child_safety' THEN 0 ELSE 1 END,
+                r.created_at DESC, r.id DESC LIMIT $2 OFFSET $3`,
       [dto.status ?? 'open', limit + 1, offset],
     );
     return {

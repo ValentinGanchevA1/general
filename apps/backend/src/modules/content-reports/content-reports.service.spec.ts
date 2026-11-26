@@ -57,6 +57,22 @@ describe('ContentReportsService', () => {
       .rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('prioritizes child safety reports and omits report content from the standard admin queue', async () => {
+    const { query, service } = make();
+    query.mockResolvedValueOnce([{
+      id: target, reporter_id: reporter, target_type: 'story', target_id: target,
+      reason: 'child_safety', status: 'open', created_at: new Date('2026-11-26T10:00:00Z'),
+      reviewed_at: null, target_display_name: 'Author', target_caption: null, target_media_url: null,
+    }]);
+    const page = await service.list({ status: 'open', limit: 10, offset: 0 });
+    expect(query.mock.calls[0]?.[0]).toContain(
+      "ORDER BY CASE WHEN r.reason = 'child_safety' THEN 0 ELSE 1 END",
+    );
+    expect(page.items[0]).toMatchObject({
+      reason: 'child_safety', targetCaption: null, targetMediaUrl: null,
+    });
+  });
+
   it('only returns bounded queue entries', async () => {
     const { query, service } = make();
     query.mockResolvedValueOnce([]);

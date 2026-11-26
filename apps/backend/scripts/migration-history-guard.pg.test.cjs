@@ -111,7 +111,7 @@ test('PostgreSQL migration safety — isolated CI cluster only', { skip: !enable
       await assert.rejects(
         run(db),
         (error) => error.code === 'MIGRATION_HISTORY_DRIFT' &&
-          /15 applied migration filename/.test(error.message),
+          /14 applied migration filename/.test(error.message),
       );
       const tracked = await db.query(
         'SELECT filename FROM public.schema_migrations ORDER BY filename',

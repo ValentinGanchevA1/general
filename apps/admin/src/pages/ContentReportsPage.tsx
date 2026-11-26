@@ -77,7 +77,14 @@ export default function ContentReportsPage() {
             <article key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
               <div className="flex flex-wrap gap-2 text-sm items-center">
                 <strong>{report.targetType === 'story' ? 'Story' : 'Profile'}</strong>
-                <span className="rounded bg-muted px-2 py-0.5">{report.reason}</span>
+                <span
+                  className={report.reason === 'child_safety'
+                    ? 'rounded border border-red-700 bg-red-950 px-2 py-0.5 font-semibold text-red-100'
+                    : 'rounded bg-muted px-2 py-0.5'}
+                  aria-label={report.reason === 'child_safety' ? 'Urgent child safety report' : undefined}
+                >
+                  {report.reason === 'child_safety' ? 'URGENT: Child safety' : report.reason}
+                </span>
                 <span className="text-muted-foreground">{new Date(report.createdAt).toLocaleString()}</span>
               </div>
               <div className="text-sm break-all">
@@ -85,10 +92,17 @@ export default function ContentReportsPage() {
                 <p><strong>Reporter ID:</strong> {report.reporterId}</p>
                 <p><strong>Report ID:</strong> {report.id}</p>
               </div>
-              {report.targetCaption ? (
+              {report.reason === 'child_safety' ? (
+                <p role="alert" className="rounded border border-red-700 p-3 text-sm">
+                  Potential child exploitation concern. Follow the designated child-safety escalation
+                  procedure. Do not download, copy, attach, or forward suspected illegal material.
+                  Content previews and media links are intentionally withheld from this queue.
+                </p>
+              ) : null}
+              {report.reason !== 'child_safety' && report.targetCaption ? (
                 <p className="border-l-2 pl-3 whitespace-pre-wrap break-words text-sm">{report.targetCaption}</p>
               ) : null}
-              {report.targetMediaUrl ? (
+              {report.reason !== 'child_safety' && report.targetMediaUrl ? (
                 <a className="underline text-sm" href={report.targetMediaUrl}
                   target="_blank" rel="noopener noreferrer">Inspect reported media (may be sensitive)</a>
               ) : null}
