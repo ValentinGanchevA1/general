@@ -15,10 +15,13 @@ import { PulseCheckInService } from './pulse-check-in.service';
 import { PulseDiscoveryFeedService } from './pulse-discovery-feed.service';
 import { PulsePlaceTrendingService } from './pulse-place-trending.service';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [AuthModule, RealtimeModule],
   controllers: [FeedController, PlaceController],
   providers: [
+    UgcTermsAcceptanceGuard,
     FeedService,
     MapTilerPlaceAttestationService,
     PlaceActivityLinkService,

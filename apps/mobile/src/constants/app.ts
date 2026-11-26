@@ -13,3 +13,6 @@ export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy/';
 
 /** Canonical hosted Terms of Service (Render static site `g88-legal`). */
 export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/terms/';
+
+/** NEXUS Child Safety Standards page. */
+export const CHILD_SAFETY_STANDARDS_URL = 'https://g88-legal.onrender.com/child-safety/';

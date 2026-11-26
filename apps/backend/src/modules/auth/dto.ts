@@ -1,5 +1,5 @@
 import type { ForgotPasswordRequest, ResetPasswordRequest } from '@g88/shared';
-import { IsEmail, IsString, IsOptional, MinLength, MaxLength, Matches, IsByteLength } from 'class-validator';
+import { IsEmail, IsString, IsOptional, IsBoolean, MinLength, MaxLength, Matches, IsByteLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -68,4 +68,18 @@ export class ResetPasswordDto extends ForgotPasswordDto implements ResetPassword
   @MaxLength(72)
   @IsByteLength(0, 72)
   newPassword!: string;
+}
+
+
+export class AcceptUgcTermsDto {
+  @IsBoolean()
+  accepted!: boolean;
+
+  @IsString()
+  @MaxLength(64)
+  termsVersion!: string;
+
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  termsSha256!: string;
 }

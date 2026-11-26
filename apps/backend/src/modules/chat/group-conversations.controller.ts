@@ -30,6 +30,7 @@ import type {
 import { RealtimeEmitterService } from '../../realtime/realtime-emitter.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { GroupConversationsService } from './group-conversations.service';
 
 class CreateGroupConversationDto implements CreateGroupConversationRequest {
@@ -61,6 +62,7 @@ export class GroupConversationsController {
     return this.groups.list(userId);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async create(

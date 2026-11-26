@@ -6,6 +6,7 @@ import type { MarketplaceListingSummary } from '@g88/shared';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { BrowseMarketplaceDto, CreateMarketplaceListingDto } from './marketplace.dto';
 import { MarketplaceService } from './marketplace.service';
 
@@ -17,6 +18,7 @@ export class MarketplaceController {
     private readonly discovery: DiscoveryRealtimePublisher,
   ) {}
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })

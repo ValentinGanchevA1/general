@@ -61,9 +61,11 @@ import { SuggestionsScreen } from '@/screens/SuggestionsScreen';
 import type { AreaCategory, VerificationLevel } from '@g88/shared';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { AgeEligibilityScreen } from '@/screens/AgeEligibilityScreen';
+import { TermsAcceptanceScreen } from '@/screens/TermsAcceptanceScreen';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { restoreSession } from '@/features/auth/authSlice';
 import { canEnterSocial, checkAgeEligibility } from '@/features/auth/ageEligibilitySlice';
+import { canContinueWithTerms, checkUgcTermsAcceptance, deferTermsForSession } from '@/features/auth/termsAcceptanceSlice';
 import { placeDeepLinkQueue } from '@/features/places/placeDeepLink';
 import { registerPushToken, setupNotificationHandlers } from '@/lib/pushNotifications';
 import { pingGamification } from '@/features/gamification/useGamification';
@@ -93,6 +95,7 @@ export type TabParamList = {
 export type RootStackParamList = {
 	Auth: undefined;
 	AgeEligibility: undefined;
+	TermsAcceptance: undefined;
 	ProfileCreation: undefined;
 	WorldSelection: undefined;
 	Main: NavigatorScreenParams<TabParamList> | undefined;
@@ -359,6 +362,23 @@ function buildNavigationTheme(colors: ThemeColors, dark: boolean): NavigationThe
 	return { ...base, dark, colors: { ...base.colors, primary: colors.primary, background: colors.bg, card: colors.surface, text: colors.textPrimary, border: colors.border, notification: colors.danger } };
 }
 
+function TermsAcceptanceBanner({ colors, onPress }: Readonly<{ colors: ThemeColors; onPress: () => void }>): React.JSX.Element {
+	return (
+		<View style={{ position: 'absolute', top: 48, left: 16, right: 16, zIndex: 20, elevation: 20 }}>
+			<TouchableOpacity
+				accessibilityRole="button"
+				accessibilityLabel="Review Terms before creating or uploading content"
+				style={{ minHeight: 44, borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }}
+				onPress={onPress}
+			>
+				<Text style={{ color: colors.textPrimary, textAlign: 'center', fontWeight: '600' }}>
+					Accept Terms before posting or sending content
+				</Text>
+			</TouchableOpacity>
+		</View>
+	);
+}
+
 export function AppNavigator(): React.JSX.Element {
 	const { colors: themeColors, scheme } = useAppTheme();
 	const dispatch = useAppDispatch();
@@ -368,6 +388,9 @@ export function AppNavigator(): React.JSX.Element {
 	const profileSetupComplete = useAppSelector((s) => s.auth.profileSetupComplete);
 	const ageGate = useAppSelector((s) => s.ageEligibility);
 	const ageReady = canEnterSocial(userId, ageGate);
+	const termsGate = useAppSelector((s) => s.termsAcceptance);
+	const termsReady = canContinueWithTerms(userId, termsGate);
+	const termsDeferred = termsGate.deferredForSession;
 	const worldModes = useAppSelector((s) => s.worldModes);
 	const launchInteractionsReady = useNexaLaunchInteractionsReady();
 	const prevUserRef = useRef<string | null>(null);
@@ -385,10 +408,23 @@ export function AppNavigator(): React.JSX.Element {
 		void dispatch(checkAgeEligibility(userId));
 	}, [dispatch, userId, restoring, ageGate.userId, ageGate.phase]);
 	useEffect(() => {
-		if (WORLD_MODES_ENABLED && userId && ageReady && !restoring) {
+		if (!userId || restoring || !ageReady || (termsGate.userId === userId && termsGate.phase !== 'idle')) return;
+		void dispatch(checkUgcTermsAcceptance(userId));
+	}, [dispatch, userId, restoring, ageReady, termsGate.userId, termsGate.phase]);
+	useEffect(() => {
+		if (!navigationReady || !userId || navigationRef.getCurrentRoute()?.name !== 'TermsAcceptance') return;
+		if (termsReady) {
+			if (profileSetupComplete) navigationRef.navigate('Main');
+			else navigationRef.navigate('ProfileCreation');
+		} else if (termsDeferred) {
+			navigationRef.navigate('Main');
+		}
+	}, [navigationReady, userId, termsReady, termsDeferred, profileSetupComplete]);
+	useEffect(() => {
+		if (WORLD_MODES_ENABLED && userId && ageReady && termsReady && !restoring) {
 			void dispatch(hydrateWorldMode(userId));
 		}
-	}, [dispatch, userId, ageReady, restoring]);
+	}, [dispatch, userId, ageReady, termsReady, restoring]);
 	useEffect(() => {
 		let active = true;
 		const acceptUrl = (url: string | null): void => {
@@ -403,21 +439,24 @@ export function AppNavigator(): React.JSX.Element {
 		};
 	}, []);
 	useEffect(() => {
-		if (!navigationReady || !userId || !ageReady || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
+		if (!navigationReady || !userId || !ageReady || !termsReady || !profileSetupComplete || pendingPlaceDeepLinkId == null) return;
 		openViaRef('PlaceDetail', { placeId: pendingPlaceDeepLinkId });
 		placeDeepLinkQueue.clear(pendingPlaceDeepLinkId);
-	}, [navigationReady, pendingPlaceDeepLinkId, ageReady, profileSetupComplete, userId]);
-	useEffect(() => { if (!userId || !ageReady) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId, ageReady]);
-	useEffect(() => { if (!userId) prevUserRef.current = null; if (!launchInteractionsReady || !ageReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } }, [launchInteractionsReady, userId, ageReady]);
-	useEffect(() => { if (!launchInteractionsReady || !userId || !ageReady || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, ageReady, restoring]);
+	}, [navigationReady, pendingPlaceDeepLinkId, ageReady, termsReady, profileSetupComplete, userId]);
+	useEffect(() => { if (!userId || !ageReady || !termsReady) return; return setupNotificationHandlers((screen, params) => { openViaRef(screen as Parameters<typeof openViaRef>[0], params); }); }, [userId, ageReady, termsReady]);
+	useEffect(() => { if (!userId) prevUserRef.current = null; if (!launchInteractionsReady || !ageReady || !termsReady) return; if (userId && prevUserRef.current !== userId) { prevUserRef.current = userId; void registerPushToken(); void pingGamification(); } }, [launchInteractionsReady, userId, ageReady, termsReady]);
+	useEffect(() => { if (!launchInteractionsReady || !userId || !ageReady || !termsReady || restoring) return; let cancelled = false; const t = setTimeout(() => { void (async () => { const phone = await takePendingPhoneVerify(); if (cancelled || !phone) return; openViaRef('Verification', { initialPhone: phone }); })(); }, 700); return () => { cancelled = true; clearTimeout(t); }; }, [launchInteractionsReady, userId, ageReady, termsReady, restoring]);
 	if (restoring && user === null) return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
-	const worldModeHydratedForUser = ageReady && userId != null && worldModes.ownerId === userId && worldModes.hydrated;
-	if (userId && ageReady && profileSetupComplete && WORLD_MODES_ENABLED && !worldModeHydratedForUser) {
+	const worldModeHydratedForUser = ageReady && termsReady && userId != null && worldModes.ownerId === userId && worldModes.hydrated;
+	if (userId && ageReady && termsReady && profileSetupComplete && WORLD_MODES_ENABLED && !worldModeHydratedForUser) {
 		return <View style={{ flex: 1, backgroundColor: themeColors.bg, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Loading your NEXUS preferences" accessibilityRole="progressbar"><BrandLogo size={120} /></View>;
 	}
-	return <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
+	const renderTermsAcceptance = (): React.JSX.Element => (
+		<TermsAcceptanceScreen onContinueWithoutPosting={() => dispatch(deferTermsForSession())} />
+	);
+	return <View style={{ flex: 1 }}><NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={() => { setNavigationReady(true); navigationIntegration.registerNavigationContainer(navigationRef); }}><BottomSheetModalProvider>
 		<Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themeColors.bg } }}>
-			{user ? (ageReady ? <>{!profileSetupComplete ? <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} /> : null}{profileSetupComplete && WORLD_MODES_ENABLED && worldModes.firstRunPending ? <Stack.Screen name="WorldSelection" component={WorldSelectionScreen} /> : null}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /></> : <Stack.Screen name="AgeEligibility" component={AgeEligibilityScreen} />) : <Stack.Screen name="Auth" component={AuthScreen} />}
+			{user ? (ageReady ? (termsReady || termsDeferred ? <>{!profileSetupComplete ? <Stack.Screen name="ProfileCreation" component={ProfileCreationScreen} /> : null}{profileSetupComplete && WORLD_MODES_ENABLED && worldModes.firstRunPending ? <Stack.Screen name="WorldSelection" component={WorldSelectionScreen} /> : null}<Stack.Screen name="Main" component={MainTabs} /><Stack.Screen name="Chat" component={ChatScreen} /><Stack.Screen name="AlertComposer" component={AlertComposerScreen} /><Stack.Screen name="UserProfile" component={UserProfileScreen} /><Stack.Screen name="MutualFriends" component={MutualFriendsScreen} options={{ headerShown: false }} /><Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} /><Stack.Screen name="GiftsInbox" component={GiftsInboxScreen} /><Stack.Screen name="Interactions" component={InteractionsScreen} options={{ headerShown: false }} /><Stack.Screen name="Gamification" component={GamificationNavigator} options={{ headerShown: false }} /><Stack.Screen name="Commerce" component={CommerceNavigator} options={{ headerShown: false }} /><Stack.Screen name="Account" component={AccountNavigator} options={{ headerShown: false }} /><Stack.Screen name="Social" component={SocialNavigator} options={{ headerShown: false }} /><Stack.Screen name="Events" component={EventsNavigator} options={{ headerShown: false }} /><Stack.Screen name="TermsAcceptance">{renderTermsAcceptance}</Stack.Screen></> : <Stack.Screen name="TermsAcceptance">{renderTermsAcceptance}</Stack.Screen>) : <Stack.Screen name="AgeEligibility" component={AgeEligibilityScreen} />) : <Stack.Screen name="Auth" component={AuthScreen} />}
 		</Stack.Navigator>{user && ageReady ? <AmbientToastHost /> : null}<AppAlertHost />
-	</BottomSheetModalProvider></NavigationContainer>;
+	</BottomSheetModalProvider></NavigationContainer>{user && ageReady && termsDeferred && !termsReady ? <TermsAcceptanceBanner colors={themeColors} onPress={() => navigationRef.navigate('TermsAcceptance')} /> : null}</View>;
 }

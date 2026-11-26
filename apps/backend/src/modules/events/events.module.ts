@@ -9,10 +9,13 @@ import { FeedModule } from '../feed/feed.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RealtimeModule } from '../../realtime/realtime.module';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [FeedModule, NotificationsModule, RealtimeModule],
   controllers: [EventsController, EventReviewsController, AdminEventReviewsController],
   providers: [
+    UgcTermsAcceptanceGuard,
     EventPulseShareService,
     EventReviewsService,
     EventsService,

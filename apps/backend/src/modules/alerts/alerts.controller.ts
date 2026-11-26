@@ -6,6 +6,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { AlertResponse } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AlertsService } from './alerts.service';
 import { CreateAlertDto } from './dto';
@@ -21,6 +22,7 @@ export class AlertsController {
    * Persists a location-tagged area alert authored by the calling user.
    * Location is copied from the user's last fuzzed heartbeat position.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })

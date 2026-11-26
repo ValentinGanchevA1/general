@@ -8,9 +8,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { RealtimeModule } from '../../realtime/realtime.module';
 import { S3Service } from '../../common/s3.service';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [NotificationsModule, RealtimeModule],
   controllers: [ListingsController, MarketplaceController],
-  providers: [ListingsService, MarketplaceService, ListingsExpiryService, S3Service],
+  providers: [UgcTermsAcceptanceGuard, ListingsService, MarketplaceService, ListingsExpiryService, S3Service],
 })
 export class ListingsModule {}

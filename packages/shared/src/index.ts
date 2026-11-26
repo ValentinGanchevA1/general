@@ -24,6 +24,7 @@ export * from './analytics';
 export * from './mapRendererPolicy';
 export * from './social';
 export * from './groupChat';
+export * from './ugc-terms';
 
 export interface PendingVerificationSummary {
   id: string;

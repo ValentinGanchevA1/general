@@ -29,6 +29,7 @@ import type {
 
 import { S3Service } from '../../common/s3.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { StoriesService } from './stories.service';
 import {
@@ -63,6 +64,7 @@ export class StoriesController {
   ) {}
 
   /** POST /api/v1/stories/presign — get S3 PUT URL for media. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('presign')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
@@ -77,6 +79,7 @@ export class StoriesController {
    * POST /api/v1/stories/media/base64 — upload story media via base64 JSON.
    * Kept for photo compatibility; large video clients should use presigned upload.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('media/base64')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
@@ -91,6 +94,7 @@ export class StoriesController {
    * POST /api/v1/stories/media/upload — bounded multipart compatibility path.
    * FileInterceptor uses memory storage, so presigned upload is preferred for large media.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('media/upload')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
@@ -114,6 +118,7 @@ export class StoriesController {
   }
 
   /** POST /api/v1/stories — create a 24h story after media is uploaded. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })

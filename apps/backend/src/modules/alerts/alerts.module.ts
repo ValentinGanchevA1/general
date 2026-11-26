@@ -6,9 +6,11 @@ import { GamificationModule } from '../gamification/gamification.module';
 import { ChallengesModule } from '../challenges/challenges.module';
 import { AchievementsModule } from '../achievements/achievements.module';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [NotificationsModule, GamificationModule, ChallengesModule, AchievementsModule],
   controllers: [AlertsController],
-  providers: [AlertsService],
+  providers: [UgcTermsAcceptanceGuard, AlertsService],
 })
 export class AlertsModule {}

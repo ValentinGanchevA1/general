@@ -1,11 +1,13 @@
 # NEXUS — Play Console closed-testing and production checklist
 
 > **Scope:** owner-side Google Play Console steps for shipping **NEXUS** while preserving the existing Android package `com.g88` for compatibility.
-> Core build/release automation is in place, but physical-device QA and the dedicated Terms requirement in #592 remain release gates.
+> Core release automation exists, but Terms/Child Safety approval, real Console declarations, and the current signed-AAB device check remain open. The latest master is `27b6ae2` (NEXUS 1.0.1 RC2); the connected device has an older sideload APK, not that AAB.
 > Background + rationale: `DEPLOY.md` → "Mobile release". Paste-ready store copy:
 > `docs/play-store-listing.md` and `docs/play-release-notes.md`.
 
 Work top to bottom. Do not treat a successful CI build as device or production sign-off.
+
+**Evidence checkpoint (26 Nov 2026):** ADB lists a Huawei FOA-L29, but installed `com.g88` is a sideload APK at 1.0.0 / versionCode 2555. The latest AAB artifact is for old commit `e6c6c50`; no AAB for current master `27b6ae2` is available. Do not mark #580 complete from the installed APK.
 
 ---
 
@@ -16,7 +18,7 @@ Work top to bottom. Do not treat a successful CI build as device or production s
 - [ ] `docs/play-store-listing.md` (NEXUS name, short/full description, Data Safety notes).
 - [ ] `docs/play-release-notes.md` (tester-facing release notes).
 - [ ] Privacy policy URL: `https://g88-legal.onrender.com/privacy` — verify it loads and visibly says **NEXUS**.
-- [ ] Issue #592 — dedicated NEXUS Terms of Service. Closed testing may continue while reviewed, but production is **NO-GO** until a real `/terms` document is live and the app no longer routes Terms to Privacy.
+- [ ] Issue #592 — use the no-automatic-publication procedure in `docs/legal-review/NEXUS_TERMS_PUBLICATION_GUIDE.md`. The Terms source is a review candidate, not an approval record; keep `/terms` unpublished until counsel + owner approval, exact candidate SHA-256 manifest, independent verification and a reviewed publication PR. Anonymous public reachability has not been verified here.
 - [ ] Issue #580 — physical-device NEXUS release audit.
 - [ ] Tester email addresses (Google Group or explicit list).
 
@@ -101,15 +103,15 @@ A grey/blank map on Play-installed builds is a release blocker until this restri
   - Complete the Play Console precise-location justification when offered. Google's November 2026 declaration precedes **27 January 2027** enforcement; do not wait for the mandatory deadline.
   - Re-check the final merged/signed AAB manifest and runtime permissions; source manifest alone is insufficient.
 - [ ] **Data Safety precision:** NEXUS's public ~120m H3 cell is still below Google's **3 km²** threshold for *precise* location. Mark precise-location collection based on off-device processing and optional live DM persistence, not solely on how coarsened pins look.
-- [ ] **UGC Terms acceptance:** #592 requires versioned Terms acceptance before posting/uploading; showing a Terms hyperlink without an actual acceptance state is insufficient.
+- [ ] **UGC Terms acceptance:** master still lacks an actual acceptance state. The current PR adds version/hash-bound explicit acceptance and server-side write checks; it is not merged or deployed. The limited-use option must preserve report, block and account deletion while the API rejects content creation/upload/message sending. Keep enforcement disabled until the approved Terms hash, Privacy/Data Safety update, migration and staging/device QA are complete.
 
 ### 6A. 18+ enforcement and Child Safety Standards
 
 - [ ] Verify the exact signed release AAB and deployed API enforce adult eligibility for email registration, Google OAuth, existing/legacy accounts, refresh/session restore, protected REST routes and Socket.IO. Keep production `NEXUS_REQUIRE_ADULT_AGE` OFF until separately isolated staging and physical-device cases pass.
 - [ ] Test an under-18 synthetic account, DOB-null legacy account, OAuth DOB-null account, account switch, network/database failure, deep link, push, and active Socket.IO session. No protected Social access is allowed until the server confirms eligibility.
 - [ ] Keep Dating disabled end-to-end for RC1: mobile UI, profile preference writes, REST likes/pass, Dating discovery and Dating realtime events. Track #1173; do not turn on either Dating approval setting for RC1.
-- [ ] For a Social-category app, prepare publicly accessible CSAE/CSAM standards regardless of the selected target age. The final standards must be legally reviewed and published; the present Child Safety document and PR #1140 are review candidates only.
-- [ ] Verify the complete in-app report/feedback and block mechanisms on the exact signed AAB and deployed API; run synthetic report → admin queue → authorized moderation action → audit trail tests. Do not claim CSAM operational handling solely from source files.
+- [ ] For a Social-category app, prepare publicly accessible CSAE/CSAM standards regardless of target age. The current repository page is source text only; confirm the exact version is legally reviewed, published at an anonymous HTTPS URL, and names NEXUS before entering it in Play Console.
+- [ ] Verify the complete in-app report/feedback and block mechanisms on the exact signed AAB and deployed API; run synthetic report → admin queue → authorized moderation action → audit trail tests. The Terms gate must leave these safety/account routes usable without consent. Do not claim CSAM operational handling solely from source files.
 - [ ] Confirm the named Child Safety point of contact, exact Play developer-account mailbox, monitored access and successful test delivery. Do not publish an address until the owner confirms it and delivery is verified.
 - [ ] Record operational coverage, backup responder, lawful escalation route and evidence-retention/deletion process with counsel. Do not promise a 24/7 or fixed response SLA without staffed capacity.
 - [ ] Product owner reviews the release candidate first; a qualified legal reviewer then approves the exact final Terms, Privacy and Child Safety text/version/effective date before public publication and Play submission.

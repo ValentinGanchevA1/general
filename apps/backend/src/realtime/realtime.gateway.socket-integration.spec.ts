@@ -11,6 +11,7 @@ import { EventRoomAccessService } from './event-room-access.service';
 import { RealtimeEmitterService } from './realtime-emitter.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { AdultEligibilityService } from '../modules/auth/adult-eligibility.service';
+import { UgcTermsAcceptanceService } from '../modules/auth/ugc-terms-acceptance.service';
 import { DiscoveryPresencePublisher } from './discovery-presence.publisher';
 import { PresenceService } from '../modules/presence/presence.service';
 import { ChatService } from '../modules/chat/chat.service';
@@ -293,6 +294,7 @@ describe('RealtimeGateway real Socket.IO revocation integration', () => {
         RealtimeEmitterService,
         WsJwtGuard,
         { provide: AdultEligibilityService, useValue: { assertEligible: jest.fn(async () => undefined) } },
+        { provide: UgcTermsAcceptanceService, useValue: { hasCurrentAcceptance: jest.fn(async () => true) } },
         BlocksService,
         {
           provide: PresenceService,

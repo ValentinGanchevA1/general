@@ -7,9 +7,11 @@ import { PresenceModule } from '../presence/presence.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { BlocksModule } from '../blocks/blocks.module';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [AuthModule, PresenceModule, MessagingModule, BlocksModule],
-  providers: [UsersService, S3Service],
+  providers: [UgcTermsAcceptanceGuard, UsersService, S3Service],
   controllers: [UsersController],
   exports: [UsersService],
 })

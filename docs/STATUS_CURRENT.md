@@ -1,7 +1,7 @@
 # NEXUS — current status
 
-> **Synced:** 2026-11-24  
-> **Verified source baseline:** `master` at `38687e9815f6c0ba97e809d837e2d02e6cf432d7` (includes docs/play child-safety draft #1076 and prior group-chat work). Merged code is not evidence of deployed backend state or physical-device sign-off.  
+> **Synced:** 2026-11-26  
+> **Verified source baseline:** `master` at `27b6ae22c95f84c0a16b3ee76b23549d68c37ab2` (includes docs/play child-safety draft #1076 and prior group-chat work). Merged code is not evidence of deployed backend state or physical-device sign-off.  
 > **Migration allocation:** inspect `apps/backend/migrations` and the CI prefix guard before allocating a number. Group-chat related migrations on disk include **0038**, **0066**, **0067**. Earlier recovery 0051 / reviews 0052 / occupation 0053 remain merged historically; deployment application is not verified by this snapshot.  
 > Root `STATUS.md` is a historical progress log and may lag. This file is the live status pointer from `README.md`.  
 > Early super-app MVP drafts are historical only — see `docs/HISTORICAL-SUPERAPP-PLANS.md`.
@@ -127,8 +127,8 @@ Do not treat an old PR-scoped preview as authoritative production evidence.
 
 | Gate | State | Why it remains open |
 |---|---|---|
-| **#592 — dedicated NEXUS Terms of Service** | 🔴 open (P1) | Formal path in `docs/legal-review/` (draft 2026-11-07, counsel handoff 2026-11-19, PUBLICATION_GUIDE, `scripts/legal/prepare-approved-terms.mjs`). Public `/terms` must stay unpublished until counsel + owner approval + `NEXUS_TERMS_APPROVAL.json` + prepare `--write` via reviewed PR. Live `g88-legal` `/terms` = **404** (correct). `TERMS_OF_SERVICE_URL` still equals Privacy until approved. PR #1067 acceptance needs approved URL. Do not invent or deploy final legal language. |
-| **#580 — physical Android release audit** | 🟡 external/device | Requires RC installation and focused QA on a real Android device, including Friends/429, privacy, accessibility, visual/interaction checks, and **group chat** smoke. |
+| **#592 — dedicated NEXUS Terms of Service / UGC acceptance** | 🔴 open (P1) | Master contains Terms v1.0 and Child Safety Standards v1.0 source pages, but no counsel approval record or approved candidate/manifest. The Terms publication guide requires a legal-reviewed candidate, exact SHA-256 approval record, independent owner verification, explicit `--write`, reviewed PR, then public URL verification; it says keep `/terms` unpublished until then. The current Terms HTML lacks the required `NEXUS_TERMS_VERSION` comment and `<time datetime>` and its H1 does not match the publication script contract. This branch adds explicit version/hash acceptance and server UGC checks behind `NEXUS_REQUIRE_UGC_TERMS`; it remains opt-in, unmerged and undeployed. Privacy/Data Safety updates, migration 0078, report/delete access QA, and the random-chat classification remain open. Do not submit the candidate pages or claim legal approval.
+| **#580 — physical Android release audit** | 🟡 external/device | ADB now enumerates a Huawei FOA-L29. Installed `com.g88` is a sideloaded APK, version 1.0.0 / versionCode 2555, updated 26 Nov. The latest AAB artifact is from run 42953361471 at old commit `e6c6c50c6a7345e970217e3e785df03b2af5dafe`; it is not the current master (`27b6ae2`, 1.0.1 RC2). No current-master AAB has been produced or installed, so device sign-off remains open.
 | **#669 — launch calibration** | 🟡 external/device | Requires physical-device recordings + telemetry before changing launch timing constants. |
 | **#616 — Play Store visual set** | 🟡 sequenced | Final screenshots follow physical-device sign-off; live UI evidence must come from an approved audited RC/device capture. |
 | **MapLibre production activation** | 🟡 operational + device | Code/CI gates are merged; live policy proof + real-provider canary/device evidence remain before default activation. |
@@ -163,7 +163,7 @@ Conversation refresh diagnostics (#805) use the same privacy principle: fixed cl
 ## 7. Current priorities
 
 1. **Physical-device release QA** — complete #580 and #669 without changing launch constants from subjective feel alone; include group create/send/leave/kick.
-2. **Legal production gate (#592)** — keep public `/terms` 404 until counsel-approved candidate HTML + approval manifest + prepare script write via reviewed PR → Render. Then wire `TERMS_OF_SERVICE_URL`, CI `NEXUS_TERMS_VERSION` / `NEXUS_TERMS_SHA256`, migration 0072, and device acceptance QA before `NEXUS_REQUIRE_UGC_TERMS`.
+2. **Legal production gate (#592)** — follow `docs/legal-review/NEXUS_TERMS_PUBLICATION_GUIDE.md` exactly: human legal review, matching approval record, independently verified `--write` via reviewed PR, then anonymous HTTPS verification. Only then configure the approved Terms version/hash, apply migration 0078, update Privacy/Data Safety, test consent + safety/report/delete paths, and enable `NEXUS_REQUIRE_UGC_TERMS`.
 3. **Controlled MapLibre rollout evidence** — complete live remote-policy proof, manual provider canaries and physical-device validation before any production opt-in.
 4. **Play Store visuals** — finish #616 only after the approved device baseline has no open P0/P1 release blocker.
 5. **Web production topology** — choose final hostname/edge policy + production tile stack and run deployed HTTPS validation against the final topology.

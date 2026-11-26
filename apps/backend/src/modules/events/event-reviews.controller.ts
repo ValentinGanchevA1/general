@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AdminGuard } from '../id-verification/admin.guard';
 import { EventReviewsService } from './event-reviews.service';
@@ -13,8 +14,10 @@ export class EventReviewsController {
   constructor(private readonly service: EventReviewsService) {}
   @Get(':id/reviews/me')
   me(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string) { return this.service.me(actor, id); }
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/reviews')
   create(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, false); }
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Patch(':id/reviews/me')
   edit(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, true); }
   @Get(':id/reviews')
