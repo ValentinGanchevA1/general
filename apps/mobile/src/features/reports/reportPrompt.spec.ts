@@ -33,6 +33,23 @@ describe('report prompt — success only after backend acknowledgment', () => {
     );
   });
 
+  it('offers a dedicated child safety reason without collecting illegal media', async () => {
+    const dispatch = jest.fn().mockResolvedValue({
+      type: submitContentReport.fulfilled.type, payload: { reported: true },
+    }) as unknown as AppDispatch;
+    showContentReportPrompt(dispatch, 'story', targetId);
+    const prompt = alerts.mock.calls[0];
+    expect(prompt?.[1]).toContain('Do not attach, copy, or forward suspected illegal imagery:');
+    const option = prompt?.[2]?.find(button =>
+      button.text === 'Child safety concern (grooming or exploitation)');
+    expect(option).toBeDefined();
+    option?.onPress?.();
+    await flush();
+    expect(alerts).toHaveBeenLastCalledWith(
+      'Report sent', 'Thank you. Your report has been received for review.',
+    );
+  });
+
   it('surfaces backend failures rather than claiming a report was filed', async () => {
     const dispatch = jest.fn().mockResolvedValue({
       type: submitContentReport.rejected.type, payload: 'Network unavailable',
