@@ -12,18 +12,41 @@ const manifest = JSON.parse(readFileSync(path.resolve(
   'NEXUS_G88_15_SQL_SOURCE_CANDIDATES_2026-11-11.json',
 ), 'utf8'));
 
-test('historical source manifest covers all 15 drift names but never authorizes SQL execution', () => {
+test('historical manifest retains 15 source candidates while 14 remain absent from checkout', () => {
   const snapshot = readOwnerSnapshot(path.join(
     __dirname, 'fixtures', 'migration-history-owner-20261110.txt',
   ));
+  const migrationDir = path.join(__dirname, '..', 'migrations');
+  const localFiles = new Set(require('node:fs').readdirSync(migrationDir));
   const { entries, databaseEvidence } = manifest;
+  const unresolvedEntries = entries.filter((entry) => !localFiles.has(entry.filename));
   assert.equal(snapshot.length, 85);
   assert.equal(entries.length, 15);
   assert.deepEqual(
     entries.map((r) => r.filename).sort(),
-    Object.keys(HISTORICAL).sort(),
-    'every drift name must be represented without inventing others',
+    [...snapshot].sort(),
+    'historical manifest must retain every owner-snapshot candidate',
   );
+  assert.equal(unresolvedEntries.length, 14);
+  assert.deepEqual(
+    unresolvedEntries.map((r) => r.filename).sort(),
+    Object.keys(HISTORICAL).sort(),
+    'the 14 remaining absent source names must match the offline drift inventory',
+  );
+
+  const restoredChildSafety = entries.find((entry) =>
+    entry.filename === '0076_child_safety_report_reason.sql');
+  assert.ok(restoredChildSafety);
+  assert.ok(localFiles.has(restoredChildSafety.filename));
+  const restoredBytes = require('node:fs').readFileSync(
+    path.join(migrationDir, restoredChildSafety.filename),
+  );
+  const restoredGitBlob = createHash('sha1')
+    .update(`blob ${restoredBytes.length}\\0`)
+    .update(restoredBytes)
+    .digest('hex');
+  assert.equal(restoredGitBlob, restoredChildSafety.sourceGitBlob,
+    'restored 0076 source must match the historical candidate blob exactly');
   assert.equal(databaseEvidence.appliedCount, 85);
   assert.equal(databaseEvidence.unmatchedFilenames, 15);
   assert.deepEqual(databaseEvidence.trackerColumns, ['filename', 'applied_at']);
