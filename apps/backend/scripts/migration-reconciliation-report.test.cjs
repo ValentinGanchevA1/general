@@ -14,21 +14,27 @@ const localFiles = fs.readdirSync(path.join(__dirname, '..', 'migrations'))
 const appliedFiles = readOwnerSnapshot(
   path.join(__dirname, 'fixtures', 'migration-history-owner-20261110.txt'),
 );
+// A newly staged migration is not an applied historical filename. It must
+// remain explicitly visible as not-applied, never silently whitelisted.
+const stagedPrivateDefault = '0078_users_visibility_private_default.sql';
+const expectedNotApplied = localFiles.includes(stagedPrivateDefault)
+  ? [stagedPrivateDefault]
+  : [];
 
-test('owner-supplied history matches exactly 85 applied / 70 checkout / 15 unknown names', () => {
+test('85 applied / 70 baseline plus optional 0078 stage / 15 historical drift remain blocked', () => {
   const report = auditMigrationHistory(appliedFiles, localFiles);
   assert.equal(report.appliedCount, 85);
-  assert.equal(report.checkoutCount, 70);
+  assert.equal(report.checkoutCount, 70 + expectedNotApplied.length);
   assert.equal(report.missingFromCheckoutCount, 15);
   assert.deepEqual(
     report.missingFromCheckout.map(({ filename }) => filename),
     Object.keys(HISTORICAL).sort(),
   );
-  assert.deepEqual(report.checkoutFilesNotRecorded, []);
+  assert.deepEqual(report.checkoutFilesNotRecorded, expectedNotApplied);
   assert.deepEqual(report.duplicatePrefixes, [
     '0036', '0037', '0038', '0051', '0054', '0072', '0073',
   ]);
-  assert.equal(report.matchesOwnerSnapshot, true);
+  assert.equal(report.matchesOwnerSnapshot, expectedNotApplied.length === 0);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
   assert.ok(!Object.hasOwn(report, 'migrationRunnerUnchanged'));
@@ -61,7 +67,9 @@ test('changed checkout breaks snapshot match; not-applied migration is surfaced'
     [...localFiles, '0078_new_schema.sql'],
   );
   assert.equal(report.matchesOwnerSnapshot, false);
-  assert.deepEqual(report.checkoutFilesNotRecorded, ['0001_initial.sql', '0078_new_schema.sql']);
+  assert.deepEqual(report.checkoutFilesNotRecorded, [
+    '0001_initial.sql', '0078_new_schema.sql', ...expectedNotApplied,
+  ]);
 });
 
 test('invalid filenames and duplicated metadata fail instead of being interpreted', () => {
@@ -99,14 +107,14 @@ test('actual production migration guard still refuses all 15 mismatches before w
   assert.ok(queries.every((sql) => sql.startsWith('SELECT ')));
 });
 
-test('offline CLI always exits nonzero and reports BLOCKED even on matching fixture', () => {
+test('offline CLI always exits nonzero and reports BLOCKED with unapplied stage', () => {
   const cli = spawnSync(process.execPath, [
     path.join(__dirname, 'migration-reconciliation-report.cjs'),
   ], { encoding: 'utf8', timeout: 5000, env: {} });
   assert.equal(cli.status, 2);
   assert.equal(cli.stderr, '');
   const report = JSON.parse(cli.stdout);
-  assert.equal(report.matchesOwnerSnapshot, true);
+  assert.equal(report.matchesOwnerSnapshot, expectedNotApplied.length === 0);
   assert.equal(report.missingFromCheckoutCount, 15);
   assert.equal(report.disposition, 'BLOCKED_RECONCILIATION_REVIEW_REQUIRED');
   assert.equal(report.auditReadsDatabase, false);
