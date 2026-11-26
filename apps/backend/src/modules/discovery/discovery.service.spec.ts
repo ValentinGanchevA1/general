@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
@@ -39,6 +40,18 @@ type LoosePoint = {
 const asPoints = (ps: unknown): LoosePoint[] => ps as LoosePoint[];
 
 describe('DiscoveryService', () => {
+  const previousDatingFlag = process.env.NEXUS_DATING_ENABLED;
+  const previousDatingApproval = process.env.NEXUS_DATING_RC1_APPROVED;
+  beforeAll(() => {
+    process.env.NEXUS_DATING_ENABLED = 'true';
+    process.env.NEXUS_DATING_RC1_APPROVED = 'true';
+  });
+  afterAll(() => {
+    if (previousDatingFlag === undefined) delete process.env.NEXUS_DATING_ENABLED;
+    else process.env.NEXUS_DATING_ENABLED = previousDatingFlag;
+    if (previousDatingApproval === undefined) delete process.env.NEXUS_DATING_RC1_APPROVED;
+    else process.env.NEXUS_DATING_RC1_APPROVED = previousDatingApproval;
+  });
   let service: DiscoveryService;
   let query: jest.Mock;
   let whichAreOnline: jest.Mock;
@@ -80,6 +93,21 @@ describe('DiscoveryService', () => {
     service.nearby({ viewport: VIEWPORT, zoom: 16, requesterId: 'me', ...over });
 
   describe('guards', () => {
+    it('rejects Dating discovery while disabled before any database access', async () => {
+      const previousEnabled = process.env.NEXUS_DATING_ENABLED;
+      const previousApproved = process.env.NEXUS_DATING_RC1_APPROVED;
+      delete process.env.NEXUS_DATING_ENABLED;
+      delete process.env.NEXUS_DATING_RC1_APPROVED;
+      try {
+        await expect(call({ datingOnly: true })).rejects.toBeInstanceOf(NotFoundException);
+        expect(query).not.toHaveBeenCalled();
+      } finally {
+        if (previousEnabled === undefined) delete process.env.NEXUS_DATING_ENABLED;
+        else process.env.NEXUS_DATING_ENABLED = previousEnabled;
+        if (previousApproved === undefined) delete process.env.NEXUS_DATING_RC1_APPROVED;
+        else process.env.NEXUS_DATING_RC1_APPROVED = previousApproved;
+      }
+    });
     it('returns empty (no DB hit) when the viewport produces no cells', async () => {
       (cellsForViewport as jest.Mock).mockReturnValue([]);
       const res = await call();

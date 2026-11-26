@@ -11,6 +11,7 @@ import {
 import {resolveMapInteractionState} from './mapInteractionState';
 import {pinInteractionMachine} from './pinInteraction.machine';
 import type {ViewerMode} from './pinInteraction.types';
+import {DATING_ENABLED} from '@/constants/app';
 
 const VERIFICATION_LEVELS = new Set<VerificationLevel>([
   'none',
@@ -245,8 +246,8 @@ export function usePinInteraction({viewerMode}: UsePinInteractionOptions) {
       ? activeProfile.displayName
       : activeSeedPoint?.meta.displayName ?? 'User';
     const distanceLabel = formatNexaSpatialDistance(ctx.distanceMeters);
-    const peerAllowsDating =
-      ctx.peerMode === 'dating' || ctx.peerMode === 'both';
+    const peerAllowsDating = DATING_ENABLED
+      && (ctx.peerMode === 'dating' || ctx.peerMode === 'both');
 
     const rawAvatar = activeProfile != null && 'avatarUrl' in activeProfile
       ? (activeProfile.avatarUrl as string | null | undefined)

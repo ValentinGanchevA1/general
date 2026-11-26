@@ -11,6 +11,7 @@ import type {
 
 import { FriendsService } from '../friends/friends.service';
 import { PresenceService } from '../presence/presence.service';
+import { datingFeatureEnabled } from '../dating/dating-feature';
 
 type DiscoverableKind = EntityKind;
 
@@ -80,6 +81,7 @@ export class DiscoveryEntityResolver {
 
     const friendsOnly = context?.friendsOnly === true;
     const datingOnly = context?.datingOnly === true && !friendsOnly;
+    if (datingOnly && !datingFeatureEnabled()) return null;
     let friendIds: string[] | null = null;
     if (friendsOnly) {
       friendIds = await this.friends.listFriendIds(params.viewerId);
