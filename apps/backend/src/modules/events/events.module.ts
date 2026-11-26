@@ -14,7 +14,8 @@ import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 @Module({
   imports: [FeedModule, NotificationsModule, RealtimeModule],
   controllers: [EventsController, EventReviewsController, AdminEventReviewsController],
-  providers: [UgcTermsAcceptanceGuard,
+  providers: [
+    UgcTermsAcceptanceGuard,
     EventPulseShareService,
     EventReviewsService,
     EventsService,

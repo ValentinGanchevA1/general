@@ -13,7 +13,8 @@ import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 
 @Module({
   imports: [AuthModule, PresenceModule, AnalyticsModule],
-  providers: [UgcTermsAcceptanceGuard,
+  providers: [
+    UgcTermsAcceptanceGuard,
     ChatService,
     ChatRealtimeAccessService,
     GroupConversationsService,

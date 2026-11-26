@@ -20,7 +20,8 @@ import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 @Module({
   imports: [AuthModule, RealtimeModule],
   controllers: [FeedController, PlaceController],
-  providers: [UgcTermsAcceptanceGuard,
+  providers: [
+    UgcTermsAcceptanceGuard,
     FeedService,
     MapTilerPlaceAttestationService,
     PlaceActivityLinkService,
