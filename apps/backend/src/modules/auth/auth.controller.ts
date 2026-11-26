@@ -13,15 +13,16 @@ import {
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
-import type { LoginResponse, AuthTokens, AuthenticatedUser, AgeEligibilityStatus, ForgotPasswordResponse, ResetPasswordResponse } from '@g88/shared';
+import type { LoginResponse, AuthTokens, AuthenticatedUser, AgeEligibilityStatus, ForgotPasswordResponse, ResetPasswordResponse, UgcTermsAcceptanceStatus } from '@g88/shared';
 
 import { AuthService } from './auth.service';
 import { AdultEligibilityService } from './adult-eligibility.service';
+import { UgcTermsAcceptanceService } from './ugc-terms-acceptance.service';
 import { PasswordResetService } from './password-reset.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SkipAdultEligibility } from './age-eligibility.decorator';
 import { CurrentUser } from './current-user.decorator';
-import { AgeCompletionDto, ForgotPasswordDto, ResetPasswordDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
+import { AcceptUgcTermsDto, AgeCompletionDto, ForgotPasswordDto, ResetPasswordDto, GoogleOAuthDto, LoginDto, LogoutDto, RefreshDto, RegisterDto } from './dto';
 import {
   assertTrustedWebAuthRequest,
   clearWebRefreshCookie,
@@ -39,6 +40,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly recovery: PasswordResetService,
     private readonly adultEligibility: AdultEligibilityService,
+    private readonly ugcTermsAcceptance: UgcTermsAcceptanceService,
   ) {}
 
   @Post('forgot-password')
@@ -158,6 +160,26 @@ export class AuthController {
   ): Promise<{ eligible: true }> {
     await this.auth.completeAge(userId, dto.dateOfBirth);
     return { eligible: true };
+  }
+
+  @Get('terms-acceptance')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async ugcTermsAcceptanceStatus(
+    @CurrentUser('id') userId: string,
+  ): Promise<UgcTermsAcceptanceStatus> {
+    return this.ugcTermsAcceptance.status(userId);
+  }
+
+  @Post('terms-acceptance')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async acceptUgcTerms(
+    @CurrentUser('id') userId: string,
+    @Body() dto: AcceptUgcTermsDto,
+  ): Promise<UgcTermsAcceptanceStatus> {
+    return this.ugcTermsAcceptance.accept(userId, dto);
   }
 
   @Get('me')

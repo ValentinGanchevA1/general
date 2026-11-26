@@ -61,6 +61,7 @@ export class GroupConversationsController {
     return this.groups.list(userId);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async create(

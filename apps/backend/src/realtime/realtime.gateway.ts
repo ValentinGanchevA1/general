@@ -66,6 +66,7 @@ import { ChallengesService } from '../modules/challenges/challenges.service';
 import { FriendsService } from '../modules/friends/friends.service';
 import type { JwtPayload } from '../modules/auth/jwt.strategy';
 import { AdultEligibilityService, adultAgeGateEnabled } from '../modules/auth/adult-eligibility.service';
+import { UgcTermsAcceptanceService, ugcTermsAcceptanceEnabled } from '../modules/auth/ugc-terms-acceptance.service';
 import { corsOrigins } from '../common/cors-origins';
 
 type G88Server = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
@@ -119,6 +120,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Property injection preserves the existing gateway constructor contract.
   @Inject(AdultEligibilityService)
   private readonly adultEligibility!: AdultEligibilityService;
+
+  @Inject(UgcTermsAcceptanceService)
+  private readonly ugcTermsAcceptance!: UgcTermsAcceptanceService;
 
   constructor(
     private readonly presence: PresenceService,
@@ -393,6 +397,25 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: G88Socket,
     @MessageBody() payload: ChatSendDto,
   ): Promise<AckResult<ChatMessageEvent>> {
+    if (ugcTermsAcceptanceEnabled()) {
+      try {
+        const accepted = await this.ugcTermsAcceptance.hasCurrentAcceptance(client.data.userId);
+        if (!accepted) {
+          return {
+            ok: false,
+            code: 'legal.terms_acceptance_required',
+            message: 'Accept the current NEXUS Terms before sending a message.',
+          };
+        }
+      } catch {
+        this.logger.error('chat Terms acceptance check failed');
+        return {
+          ok: false,
+          code: 'legal.terms_acceptance_unavailable',
+          message: 'Could not verify the current Terms. Try again.',
+        };
+      }
+    }
     if (!client.rooms.has(this.conversationRoom(payload.conversationId))) {
       return { ok: false, code: 'chat.forbidden', message: 'Join the conversation first' };
     }

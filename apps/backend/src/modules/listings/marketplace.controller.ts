@@ -17,6 +17,7 @@ export class MarketplaceController {
     private readonly discovery: DiscoveryRealtimePublisher,
   ) {}
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })

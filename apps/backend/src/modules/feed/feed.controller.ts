@@ -46,6 +46,7 @@ export class FeedController {
     return this.placeLinks.enrich(response);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('check-ins')
   createCheckIn(
     @CurrentUser('id') userId: string,
@@ -54,6 +55,7 @@ export class FeedController {
     return this.checkIns.create(userId, dto);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('check-ins/by-place')
   createPlaceCheckIn(
     @CurrentUser('id') userId: string,

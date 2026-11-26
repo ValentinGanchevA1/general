@@ -168,6 +168,7 @@ export class UsersController {
     return this.users.getProfile(userId);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Patch('me/profile')
   async updateProfile(
     @CurrentUser('id') userId: string,
@@ -186,6 +187,7 @@ export class UsersController {
     await this.users.deleteAccount(userId, dto.confirm, dto.password);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('me/avatar/presigned-url')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async avatarPresignedUrl(
@@ -195,6 +197,7 @@ export class UsersController {
     return this.s3.avatarPresignedUrl(userId, dto.contentType);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('me/photos/base64')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async uploadPhotoBase64(
@@ -222,6 +225,7 @@ export class UsersController {
     return this.users.listPhotos(userId);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('me/photos/presigned-url')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async photoPresignedUrl(
@@ -231,6 +235,7 @@ export class UsersController {
     return this.s3.photoPresignedUrl(userId, dto.contentType);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('me/photos')
   async addPhoto(
     @CurrentUser('id') userId: string,
@@ -239,6 +244,7 @@ export class UsersController {
     return this.users.addPhoto(userId, dto.url);
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Patch('me/cover')
   async setCover(
     @CurrentUser('id') userId: string,
@@ -250,6 +256,7 @@ export class UsersController {
     });
   }
 
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Patch('me/photos/order')
   async reorderPhotos(
     @CurrentUser('id') userId: string,

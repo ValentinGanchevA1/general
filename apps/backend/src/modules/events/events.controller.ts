@@ -45,6 +45,7 @@ export class EventsController {
   ) {}
 
   /** POST /api/v1/events — create an event the caller hosts. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
@@ -100,6 +101,7 @@ export class EventsController {
   }
 
   /** POST /api/v1/events/:id/share-join — explicitly publish Going to Pulse. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/share-join')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
@@ -113,6 +115,7 @@ export class EventsController {
   // ─── Polls ──────────────────────────────────────────────────────────────────
 
   /** POST /api/v1/events/:id/polls — host creates a poll. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/polls')
   @HttpCode(HttpStatus.CREATED)
   createPoll(
@@ -146,6 +149,7 @@ export class EventsController {
   // ─── Q&A ─────────────────────────────────────────────────────────────────
 
   /** POST /api/v1/events/:id/questions — ask a question. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/questions')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })

@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { AdultEligibilityService } from './adult-eligibility.service';
 import { PasswordResetMailer } from './password-reset-mailer';
 import { PasswordResetService } from './password-reset.service';
+import { UgcTermsAcceptanceService } from './ugc-terms-acceptance.service';
 
 @Module({
   imports: [
@@ -20,8 +21,8 @@ import { PasswordResetService } from './password-reset.service';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, AdultEligibilityService, PasswordResetMailer, PasswordResetService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, AdultEligibilityService, PasswordResetMailer, PasswordResetService, UgcTermsAcceptanceService],
   controllers: [AuthController],
-  exports: [JwtModule, AuthService, JwtAuthGuard, AdultEligibilityService],
+  exports: [JwtModule, AuthService, JwtAuthGuard, AdultEligibilityService, UgcTermsAcceptanceService],
 })
 export class AuthModule {}

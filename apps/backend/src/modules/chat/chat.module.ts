@@ -9,9 +9,11 @@ import { AuthModule } from '../auth/auth.module';
 import { PresenceModule } from '../presence/presence.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
+
 @Module({
   imports: [AuthModule, PresenceModule, AnalyticsModule],
-  providers: [
+  providers: [UgcTermsAcceptanceGuard,
     ChatService,
     ChatRealtimeAccessService,
     GroupConversationsService,

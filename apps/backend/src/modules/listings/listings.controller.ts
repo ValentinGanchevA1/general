@@ -44,6 +44,7 @@ export class ListingsController {
   ) {}
 
   /** POST /api/v1/listings — create a listing the caller sells. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 15 } })
@@ -68,6 +69,7 @@ export class ListingsController {
    * public URL to pass as `thumbnailUrl` on create. Base64 JSON body (RN-safe).
    * Declared before the `:id` routes so the literal path always wins.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post('photo/base64')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
@@ -155,6 +157,7 @@ export class ListingsController {
   // ─── Offers ───────────────────────────────────────────────────────────────
 
   /** POST /api/v1/listings/:id/offers — make (or re-open) an offer. */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/offers')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
@@ -217,6 +220,7 @@ export class ListingsController {
    * PUT /api/v1/listings/offers/:offerId/counter — seller counter-offer.
    * Keeps status=pending; sets last_actor=seller so buyer can accept / re-offer.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Put('offers/:offerId/counter')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   counterOffer(

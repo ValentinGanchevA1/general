@@ -21,6 +21,7 @@ export class AlertsController {
    * Persists a location-tagged area alert authored by the calling user.
    * Location is copied from the user's last fuzzed heartbeat position.
    */
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })

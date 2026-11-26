@@ -13,8 +13,10 @@ export class EventReviewsController {
   constructor(private readonly service: EventReviewsService) {}
   @Get(':id/reviews/me')
   me(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string) { return this.service.me(actor, id); }
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Post(':id/reviews')
   create(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, false); }
+  @UseGuards(UgcTermsAcceptanceGuard)
   @Patch(':id/reviews/me')
   edit(@CurrentUser('id') actor: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SaveEventReviewDto) { return this.service.save(actor, id, dto, true); }
   @Get(':id/reviews')
