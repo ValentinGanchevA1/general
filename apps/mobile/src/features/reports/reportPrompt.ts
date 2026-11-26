@@ -4,6 +4,7 @@ import { appAlert } from '@/ui/appAlert';
 import { submitContentReport } from './reportsSlice';
 
 const OPTIONS: ReadonlyArray<{ reason: ContentReportReason; label: string }> = [
+  { reason: 'child_safety', label: 'Child safety concern (grooming or exploitation)' },
   { reason: 'harassment', label: 'Harassment or bullying' },
   { reason: 'spam', label: 'Spam or scam' },
   { reason: 'hate', label: 'Hate or discrimination' },
@@ -31,7 +32,7 @@ export function showContentReportPrompt(
           : 'A report is already being sent. Please retry shortly.');
     }
   };
-  appAlert('Report ' + (targetType === 'story' ? 'story' : 'profile'), 'Choose a reason:', [
+  appAlert('Report ' + (targetType === 'story' ? 'story' : 'profile'), 'Choose a reason. Do not attach, copy, or forward suspected illegal imagery:', [
     ...OPTIONS.map(option => ({
       text: option.label,
       onPress: () => { void send(option.reason); },
