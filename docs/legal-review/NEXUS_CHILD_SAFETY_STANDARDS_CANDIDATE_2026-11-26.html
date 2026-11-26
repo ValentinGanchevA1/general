@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NEXUS Child Safety Standards review candidate.">
+  <meta name="robots" content="noindex,nofollow">
+  <title>NEXUS — Child Safety Standards (Review Candidate)</title>
+  <style>
+    :root { color-scheme: light dark; --ink:#171a26; --muted:#596071; --border:#c8cbd5; --accent:#ad327a; --bg:#fff; --panel:#f7f7fa; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    header,main,footer { max-width:820px; margin:0 auto; padding:24px; }
+    header { padding-top:42px; padding-bottom:8px; }
+    h1 { font-size:clamp(1.9rem,5vw,2.55rem); line-height:1.2; margin:.3em 0; }
+    h2 { font-size:1.28rem; margin-top:2em; border-bottom:1px solid var(--border); padding-bottom:.35em; }
+    a { color:#a02b75; text-underline-offset:3px; overflow-wrap:anywhere; }
+    a:focus-visible { outline:3px solid #32a9d1; outline-offset:3px; }
+    .brand { color:var(--accent); font-weight:800; letter-spacing:.16em; }
+    .banner { padding:13px 16px; border:2px solid #ae6b19; background:#fff3d7; color:#462a04; border-radius:8px; font-weight:700; }
+    .meta { color:var(--muted); }
+    .lead { font-size:1.08rem; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; }
+    li { margin-bottom:.35em; }
+    footer { border-top:1px solid var(--border); color:var(--muted); font-size:.92rem; padding-bottom:56px; }
+    @media (prefers-color-scheme:dark) {
+      :root { --ink:#f1f1f6; --muted:#c5c6cf; --border:#5f6170; --accent:#ff80c9; --bg:#12131b; --panel:#20212b; }
+      a { color:#ff96d4; }
+      .banner { background:#36260a; color:#fff2cd; border-color:#d69b44; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">NEXUS</div>
+    <h1>Child Safety Standards</h1>
+    <p class="banner" role="note">INTERNAL REVIEW CANDIDATE — NOT APPROVED, NOT EFFECTIVE, AND NOT FOR PUBLICATION OR GOOGLE PLAY SELF-CERTIFICATION. This document must not be moved into the public site until every legal, contact, and operational gate in the accompanying publication checklist is complete.</p>
+    <p class="meta">Review version: 2026-11-26 · Intended public path after approval: /child-safety/ · Effective date: not assigned.</p>
+  </header>
+
+  <main id="main">
+    <p class="lead">NEXUS is intended to be a social service for adults. This candidate describes prohibited child-safety conduct, expected user reporting behavior, and the safety response principles that must be supported by a verified operational process before these standards take effect.</p>
+
+    <h2 id="scope">1. Scope and zero tolerance</h2>
+    <p>NEXUS prohibits child sexual abuse and exploitation (CSAE), including child sexual abuse material (CSAM), grooming, sextortion, sexual solicitation of a minor, trafficking, and using the service to facilitate or coordinate the abuse or exploitation of a child.</p>
+    <p>This prohibition applies to text, images, audio, video, profiles, messages, Stories, events, listings, external links, and other user-generated content or interactions. Users must not create, request, upload, store, share, distribute, promote, link to, or facilitate prohibited material or conduct. Altered or AI-generated material is not exempt where it depicts, promotes, or facilitates illegal or exploitative conduct involving a child.</p>
+    <p>Users must not threaten, intimidate, or retaliate against anyone who makes a good-faith safety report.</p>
+
+    <h2 id="reporting">2. Reporting a child-safety concern</h2>
+    <p>Users should report the relevant account or supported user-generated content through the in-app reporting controls. The exact reportable content types, confirmation behavior, and delivery to the moderation queue must be verified on the release app and deployed service before these standards are published.</p>
+    <p>Provide only the minimum information needed to identify the account or content and describe the concern. <strong>Do not download, attach, copy, forward, or otherwise redistribute suspected CSAM.</strong> Do not use ordinary email to transmit suspected illegal imagery.</p>
+    <p>In-app reporting is not an emergency service and does not guarantee an immediate response. If a child appears to be in immediate danger, contact the relevant local emergency service or law-enforcement authority directly.</p>
+
+    <h2 id="review">3. Review, moderation, and enforcement</h2>
+    <p>Safety reports must be handled through a restricted process by an authorized person. Depending on the circumstances, applicable law, and available controls, NEXUS may restrict access to content, remove or disable content, limit an account, or take further action under its Terms and Community Standards. Repeat violations or attempts to evade restrictions may result in additional enforcement.</p>
+    <p>Reports and moderation decisions should be handled with appropriate priority, access controls, data minimization, and an auditable record. NEXUS must not promise 24/7 monitoring, a fixed response time, automatic CSAM detection, automatic account suspension, or immediate removal from every cache or recipient device unless the corresponding capability and staffing have been independently verified.</p>
+    <p>Where legally required, suspected exploitation must be escalated to competent authorities using a legally reviewed procedure. Evidence handling, preservation, disclosure, and deletion must be limited to what is lawful and necessary. Never ask users to send or retain copies of suspected CSAM for support or testing.</p>
+
+    <h2 id="adult-only">4. Adult-only service and location safety</h2>
+    <p>The intended first-release NEXUS Social service is restricted to people aged 18 or older. Dating and matchmaking are outside the intended first-release scope. A self-entered date of birth is an age declaration; it is not independent proof of identity or age. Before these standards become effective, the 18+ restriction must be verified across registration, OAuth, existing accounts and sessions, protected API routes, and real-time connections.</p>
+    <p>Public map discovery and optional one-to-one live-location sharing are different features. Public map presence is designed to be privacy-coarsened, while a user-initiated live-location share in a one-to-one chat can expose precise coordinates to the selected recipient and store location records. Users should share precise location only with someone they trust. See the <a href="/privacy/">NEXUS Privacy Policy</a>; its statements must be reconciled with the exact release behavior before publication.</p>
+
+    <h2 id="user-controls">5. User controls and transparency</h2>
+    <p>Reporting, blocking, visibility, and account-deletion controls must remain accessible and must be tested on the release build. Safety reports must not depend on accepting updated content-posting Terms. The public standards, Privacy Policy, Terms, app behavior, and Google Play declarations must describe the same service and safety process.</p>
+
+    <section class="panel" aria-labelledby="contact">
+      <h2 id="contact">6. Child-safety contact — publication gate not met</h2>
+      <p><strong>Designated owner:</strong> Valentin Ganchev has accepted the NEXUS Owner &amp; Child Safety Contact responsibility. This designation does not by itself establish legal approval, trained moderation coverage, a backup responder, or successful email delivery.</p>
+      <p><strong>Public child-safety email:</strong> NOT CONFIRMED. Do not publish <code>child-safety@g88.app</code> until Cloudflare Email Routing is active and an end-to-end test message is received. The current review records the domain zone as Pending, Email Routing as disabled/unconfigured, and no successful delivery test.</p>
+      <p><strong>Google Play contact:</strong> The developer-account mailbox was selected by the operator, but its exact address and successful receipt of a test message remain to be verified. Insert the approved address here only after that verification and legal review.</p>
+      <p><strong>Coverage and backup:</strong> The actual response schedule and alternate responder must be documented before this policy takes effect. Do not imply continuous monitoring where none is staffed.</p>
+    </section>
+
+    <h2 id="changes">7. Changes to these standards</h2>
+    <p>The final public version will show its approved version and effective date. Material changes will be reflected in the published document and communicated through appropriate product channels where required. The final text must be reviewed against the actual product, applicable law, and Google Play requirements before it is made effective.</p>
+  </main>
+
+  <footer>
+    <p>NEXUS Child Safety Standards — internal review candidate only. Not a current public policy. <a href="/privacy/">Privacy Policy</a>.</p>
+  </footer>
+</body>
+</html>
