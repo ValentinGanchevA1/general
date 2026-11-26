@@ -8,14 +8,8 @@ export const APP_VERSION = '1.0.0';
 /** Support + data-request contact. Mirrors the privacy policy's contact email. */
 export const SUPPORT_EMAIL = 'vganchev6@gmail.com';
 
-/** Canonical hosted privacy policy (Render static site `g88-legal`). Same URL
- *  used by the Play store listing + Data Safety form. */
-export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy';
+/** Canonical hosted privacy policy (Render static site `g88-legal`). */
+export const PRIVACY_POLICY_URL = 'https://g88-legal.onrender.com/privacy/';
 
-/**
- * Temporary closed-testing compatibility only: no dedicated Terms document is
- * published yet, so this still resolves to Privacy. Production is NO-GO until
- * issue #592 publishes reviewed NEXA Terms at a separate URL and this constant
- * is updated to that document.
- */
-export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/privacy';
+/** Canonical hosted Terms of Service (Render static site `g88-legal`). */
+export const TERMS_OF_SERVICE_URL = 'https://g88-legal.onrender.com/terms/';
