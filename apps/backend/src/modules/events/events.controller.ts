@@ -22,6 +22,7 @@ import type {
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { DiscoveryRealtimePublisher } from '../../realtime/discovery-realtime.publisher';
 import { EventPulseShareService } from './event-pulse-share.service';

@@ -4,6 +4,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import type { ActivityType, FeedResponse, PulseCheckInResult } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PlaceActivityLinkService } from './place-activity-link.service';
 import { PulseCheckInService } from './pulse-check-in.service';

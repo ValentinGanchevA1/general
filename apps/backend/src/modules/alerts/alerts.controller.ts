@@ -6,6 +6,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { AlertResponse } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AlertsService } from './alerts.service';
 import { CreateAlertDto } from './dto';

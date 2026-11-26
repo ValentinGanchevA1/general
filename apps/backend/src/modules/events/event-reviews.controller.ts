@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AdminGuard } from '../id-verification/admin.guard';
 import { EventReviewsService } from './event-reviews.service';

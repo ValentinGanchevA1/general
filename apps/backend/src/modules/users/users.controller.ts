@@ -40,6 +40,7 @@ import type {
 } from '@g88/shared';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { SkipAdultEligibility } from '../auth/age-eligibility.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';

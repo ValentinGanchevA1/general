@@ -29,6 +29,7 @@ import type {
 
 import { S3Service } from '../../common/s3.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UgcTermsAcceptanceGuard } from '../auth/ugc-terms-acceptance.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { StoriesService } from './stories.service';
 import {
