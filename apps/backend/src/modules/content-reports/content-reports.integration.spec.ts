@@ -52,6 +52,10 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
       join(__dirname, '../../..', 'migrations/0070_content_abuse_reports.sql'), 'utf8',
     );
     await db.query(migration);
+    const childSafetyMigration = readFileSync(
+      join(__dirname, '../../..', 'migrations/0076_child_safety_report_reason.sql'), 'utf8',
+    );
+    await db.query(childSafetyMigration);
     // Migration retries must not recreate, truncate or lose pending reports.
     await db.query(migration);
     reports = new ContentReportsService(db);
@@ -122,6 +126,17 @@ suite('content reports migration and moderation PostgreSQL integration', () => {
     await expect(reports.decide(moderatorId, reportId, {
       decision: 'dismiss',
     })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('accepts child safety reasons, prioritizes them, and withholds story content from the standard queue', async () => {
+    await reports.submit(reporterId, { targetType: 'user', targetId: authorId, reason: 'spam' });
+    await reports.submit(reporterId, { targetType: 'story', targetId: storyId, reason: 'child_safety' });
+    const page = await reports.list({ status: 'open', limit: 10 });
+    expect(page.items.map(item => item.reason)).toEqual(['child_safety', 'spam']);
+    expect(page.items[0]).toMatchObject({
+      targetType: 'story', reason: 'child_safety',
+      targetCaption: null, targetMediaUrl: null,
+    });
   });
 
   it('permits reporting after an author blocks the reporter or a story expires', async () => {
