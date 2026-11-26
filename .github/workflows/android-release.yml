@@ -184,9 +184,6 @@ jobs:
           ./gradlew checkReleaseMediaPermissions --no-daemon --init-script ci-init.gradle
 
       - name: Build signed release AAB
-        env:
-          SENTRY_RELEASE: ${{ env.SENTRY_RELEASE }}
-          SENTRY_DIST: ${{ env.SENTRY_DIST }}
         run: |
           cd android
           ATTEMPTS=5
