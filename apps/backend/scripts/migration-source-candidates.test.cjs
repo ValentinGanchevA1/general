@@ -42,7 +42,7 @@ test('historical manifest retains 15 source candidates while 14 remain absent fr
     path.join(migrationDir, restoredChildSafety.filename),
   );
   const restoredGitBlob = createHash('sha1')
-    .update(`blob ${restoredBytes.length}\\0`)
+    .update(`blob ${restoredBytes.length}\0`)
     .update(restoredBytes)
     .digest('hex');
   assert.equal(restoredGitBlob, restoredChildSafety.sourceGitBlob,
