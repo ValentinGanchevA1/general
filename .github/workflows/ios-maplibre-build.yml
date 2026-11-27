@@ -164,16 +164,43 @@ jobs:
           fi
 
           sleep 5
-          if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1; then
-            echo "NEXUS exited during the launch smoke window." >&2
+          # Simulator's own ps can occasionally fail to inspect the launched
+          # app; use host ps as an independent fallback before declaring a crash.
+          if ! xcrun simctl spawn "$SIM_UDID" ps -p "$PID" -o pid= >/dev/null 2>&1 &&
+             ! ps -p "$PID" -o pid= >/dev/null 2>&1; then
+            echo "NEXA exited during the launch smoke window." >&2
             xcrun simctl spawn "$SIM_UDID" log show \
               --last 2m \
               --style compact \
               --predicate 'process == "G88"' || true
+            # CI uses synthetic client config. Summarize crash metadata only;
+            # never upload entire reports, filesystem paths, or device IDs.
+            python3 - <<'PY'
+          import glob, json, os
+
+          reports = glob.glob(os.path.expanduser('~/Library/Logs/DiagnosticReports/G88-*.ips'))
+          for path in sorted(reports, key=os.path.getmtime, reverse=True)[:2]:
+              try:
+                  with open(path, encoding='utf-8') as report:
+                      lines = [next(report) for _ in range(2)]
+                  for line in lines:
+                      entry = json.loads(line)
+                      if not isinstance(entry, dict):
+                          continue
+                      for key in ('exception', 'termination'):
+                          value = entry.get(key)
+                          if isinstance(value, dict):
+                              print(f'{key}:', {
+                                  field: value[field] for field in ('type', 'signal', 'namespace', 'code')
+                                  if field in value
+                              })
+              except (OSError, StopIteration, ValueError):
+                  continue
+          PY
             exit 1
           fi
 
-          echo "NEXUS launch smoke passed with pid=$PID."
+          echo "NEXA launch smoke passed with pid=$PID."
 
       - name: Rebuild with CI-only MapLibre smoke entry
         env:

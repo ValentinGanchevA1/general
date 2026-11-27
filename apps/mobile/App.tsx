@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { hasGoogleWebClientId } from '@/features/auth/googleOAuthAvailability';
 
 import { scrubSentryPayload } from '@g88/shared';
 
@@ -47,7 +48,12 @@ Sentry.init({
   beforeBreadcrumb: (breadcrumb) => scrubSentryPayload(breadcrumb),
 });
 
-GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
+// CI and first-run builds may omit optional Google OAuth credentials. Do not
+// invoke native iOS Google Sign-In configuration with an empty client ID.
+// This does not replace the native plist/iosClientId required to enable login.
+if (hasGoogleWebClientId(Config.GOOGLE_WEB_CLIENT_ID)) {
+  GoogleSignin.configure({ webClientId: Config.GOOGLE_WEB_CLIENT_ID });
+}
 
 function AppShell(): React.JSX.Element {
   const restoring = useAppSelector((state) => state.auth.restoring);
