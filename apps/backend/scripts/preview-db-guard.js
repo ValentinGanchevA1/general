@@ -1,41 +1,57 @@
 'use strict';
 
-// Render service previews inherit parent environment variables, potentially
-// including a production DATABASE_URL. Require a purpose-specific preview
-// connection before any Nest bootstrap or SQL migrations run.
+// Render PR previews can inherit the parent DATABASE_URL. This is a defense in
+// depth check, not proof of network-level isolation or database permissions.
 const DENIED_MESSAGE = [
   'Render PR preview database isolation is unverified.',
-  'Set NEXUS_PREVIEW_DATABASE_URL to a separately provisioned preview database',
-  'that is NOT the inherited DATABASE_URL (different database host/name).',
-  'Never point a preview at production or reuse its credentials.',
+  'Use a dedicated preview database on a different host with separate credentials.',
+  'Do not run preview migrations against an inherited production database.',
 ].join(' ');
 
-function databaseIdentity(value) {
-  if (typeof value !== 'string' || value.trim() === '') return null;
+function parseDatabase(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') return null;
-    if (!parsed.hostname || !parsed.pathname || parsed.pathname === '/') return null;
-    return `${parsed.hostname.toLowerCase()}:${parsed.port || '5432'}${decodeURIComponent(parsed.pathname)}`;
+    if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) return null;
+    const name = decodeURIComponent(parsed.pathname.slice(1));
+    if (!parsed.hostname || !name || !parsed.username) return null;
+    return {
+      host: parsed.hostname.toLowerCase(),
+      port: parsed.port || '5432',
+      name,
+      user: decodeURIComponent(parsed.username),
+    };
   } catch {
     return null;
   }
 }
 
+function isPreview(env) {
+  // Render documents IS_PULL_REQUEST=true for PR previews. Also detect a
+  // preview-named service if the flag was removed or misconfigured.
+  const flag = String(env.IS_PULL_REQUEST || '').toLowerCase();
+  const serviceName = String(env.RENDER_SERVICE_NAME || '');
+  return flag === 'true' || /(?:^|[\s_-])pr[\s_-]*#?\d+(?:$|[\s_-])/i.test(serviceName);
+}
+
 function resolveDatabaseUrl(env) {
   const inherited = env.DATABASE_URL;
-  if (env.IS_PULL_REQUEST !== 'true') return inherited;
+  if (!isPreview(env)) return inherited;
 
   const dedicated = env.NEXUS_PREVIEW_DATABASE_URL;
-  const previewIdentity = databaseIdentity(dedicated);
-  const inheritedIdentity = databaseIdentity(inherited);
+  const preview = parseDatabase(dedicated);
+  const parent = parseDatabase(inherited);
+  // Different host, database name and username are required as a conservative
+  // preflight. This cannot verify actual privileges or hidden DNS aliases.
   if (
-    !previewIdentity ||
-    (typeof inherited === 'string' && (!inheritedIdentity || previewIdentity === inheritedIdentity))
+    !preview || !parent ||
+    preview.host === parent.host ||
+    preview.name === parent.name ||
+    preview.user === parent.user
   ) {
     throw new Error(DENIED_MESSAGE);
   }
   return dedicated;
 }
 
-module.exports = { resolveDatabaseUrl };
+module.exports = { resolveDatabaseUrl, isPreview };
