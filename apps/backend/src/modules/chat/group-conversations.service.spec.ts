@@ -34,13 +34,20 @@ function request() {
 }
 
 describe('GroupConversationsService', () => {
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
   const dbQuery = jest.fn();
   const transaction = jest.fn();
   const db = { query: dbQuery, transaction } as unknown as DataSource;
   const service = new GroupConversationsService(db);
 
   beforeEach(() => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
     jest.clearAllMocks();
+  });
+
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
   });
 
   it('creates a group with empty legacy participants and normalized owner/member rows', async () => {
@@ -183,7 +190,31 @@ describe('GroupConversationsService', () => {
     const leaveSql = String(txQuery.mock.calls[2]?.[0]);
     expect(leaveSql).toContain('SET left_at = NOW()');
     expect(txQuery.mock.calls[2]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
+    expect(String(txQuery.mock.calls[3]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("SET role = 'owner'"))).toBe(false);
+  });
+
+  it('preserves old schema behavior with outbox disabled', async () => {
+    const txQuery = jest.fn()
+      .mockResolvedValueOnce([{ id: GROUP_ID }])
+      .mockResolvedValueOnce([{
+        user_id: MEMBER_A,
+        role: 'member',
+        joined_at: '2026-11-01T08:00:00.000Z',
+      }])
+      .mockResolvedValueOnce([]);
+    transaction.mockImplementation(async (work: (tx: EntityManager) => Promise<unknown>) =>
+      work({ query: txQuery } as unknown as EntityManager));
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    try {
+      await service.removeMember(MEMBER_A, GROUP_ID, MEMBER_A);
+      expect(txQuery).toHaveBeenCalledTimes(3);
+      expect(txQuery.mock.calls.some(([sql]) =>
+        String(sql).includes('INSERT INTO realtime_room_revocations'))).toBe(false);
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
   });
 
   it('transfers owner to an admin before the owner leaves', async () => {
@@ -212,6 +243,7 @@ describe('GroupConversationsService', () => {
     expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(String(txQuery.mock.calls[3]?.[0])).toContain("SET role = 'owner'");
     expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID, CREATOR]);
+    expect(String(txQuery.mock.calls[5]?.[0])).toContain('INSERT INTO realtime_room_revocations');
   });
 
   it('allows an admin to remove a member but not an owner', async () => {
@@ -298,7 +330,11 @@ describe('GroupConversationsService', () => {
     expect(txQuery.mock.calls[2]?.[1]).toEqual([GROUP_ID, MEMBER_A]);
     expect(String(txQuery.mock.calls[2]?.[0])).toContain("SET role = 'owner'");
     expect(txQuery.mock.calls[3]?.[1]).toEqual([GROUP_ID, CREATOR]);
-    expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
+    expect(String(txQuery.mock.calls[4]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[4]?.[1]).toEqual([GROUP_ID, CREATOR]);
+    expect(txQuery.mock.calls[5]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
+    expect(String(txQuery.mock.calls[6]?.[0])).toContain('INSERT INTO realtime_room_revocations');
+    expect(txQuery.mock.calls[6]?.[1]).toEqual([GROUP_ID_2, CREATOR]);
     expect(txQuery.mock.calls.slice(1).some(([, params]) =>
       Array.isArray(params) && params[1] === MEMBER_B)).toBe(false);
   });

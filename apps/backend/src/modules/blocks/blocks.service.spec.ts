@@ -8,6 +8,7 @@ import { FriendsService } from '../friends/friends.service';
 import { BlocksService } from './blocks.service';
 
 describe('BlocksService', () => {
+  const previousFlag = process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
   let service: BlocksService;
   let query: jest.Mock;
   let onBlock: jest.Mock;
@@ -18,6 +19,7 @@ describe('BlocksService', () => {
   const B = '22222222-2222-2222-2222-222222222222';
 
   beforeEach(async () => {
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
     query = jest.fn().mockResolvedValue([]);
     onBlock = jest.fn().mockResolvedValue(undefined);
     leaveSharedGroupsForBlock = jest.fn().mockResolvedValue([]);
@@ -32,6 +34,11 @@ describe('BlocksService', () => {
       ],
     }).compile();
     service = mod.get(BlocksService);
+  });
+
+  afterAll(() => {
+    if (previousFlag === undefined) delete process.env.ROOM_REVOCATION_OUTBOX_ENABLED;
+    else process.env.ROOM_REVOCATION_OUTBOX_ENABLED = previousFlag;
   });
 
   it('rejects blocking yourself without querying', async () => {
@@ -69,6 +76,33 @@ describe('BlocksService', () => {
     expect(leaveRoomForUsers).toHaveBeenNthCalledWith(2, [A], 'convo:group-2');
     expect(leaveRoomForUsers).toHaveBeenNthCalledWith(3, [A, B], 'convo:conversation-1');
     expect(leaveRoomForUsers).toHaveBeenNthCalledWith(4, [A, B], 'convo:conversation-2');
+  });
+
+  it('continues social cleanup when queued group eviction dispatch throws', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis publisher unavailable');
+    });
+
+    await expect(service.block(A, B)).resolves.toBeUndefined();
+    expect(onBlock).toHaveBeenCalledWith(A, B);
+    expect(leaveRoomForUsers).toHaveBeenCalledWith([A], 'convo:group-1');
+  });
+
+  it('preserves existing dispatch failure behavior while outbox is disabled', async () => {
+    query.mockResolvedValueOnce([]);
+    leaveSharedGroupsForBlock.mockResolvedValueOnce(['group-1']);
+    leaveRoomForUsers.mockImplementationOnce(() => {
+      throw new Error('Redis adapter unavailable');
+    });
+    process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'false';
+    try {
+      await expect(service.block(A, B)).rejects.toThrow('Redis adapter unavailable');
+      expect(onBlock).not.toHaveBeenCalled();
+    } finally {
+      process.env.ROOM_REVOCATION_OUTBOX_ENABLED = 'true';
+    }
   });
 
   it('does not touch realtime rooms when there are no shared groups or accepted DM', async () => {

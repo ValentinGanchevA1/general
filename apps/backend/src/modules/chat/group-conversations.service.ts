@@ -16,6 +16,8 @@ import type {
   GroupConversationSummary,
 } from '@g88/shared';
 
+import { roomRevocationOutboxEnabled } from '../../realtime/room-revocation.config';
+
 type QueryExecutor = Pick<EntityManager, 'query'>;
 
 interface GroupRow {
@@ -310,6 +312,16 @@ export class GroupConversationsService {
           AND left_at IS NULL`,
       [conversationId, target.user_id],
     );
+
+    // Commit the revocation intent with the membership change, both for
+    // explicit kick/leave and the shared-group privacy boundary on block.
+    if (roomRevocationOutboxEnabled()) {
+      await tx.query(
+        `INSERT INTO realtime_room_revocations (conversation_id, user_id)
+         VALUES ($1, $2)`,
+        [conversationId, target.user_id],
+      );
+    }
   }
 
   private async assertInviteesEligible(
